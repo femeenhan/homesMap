@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>홈즈맵 — 우리집 물건 지도</title>
+<style>
+:root{
+  --bg:#f7f2e9; --paper:#fffdf8; --ink:#3b332a; --ink-soft:#8a7f70;
+  --accent:#e8663c; --accent-soft:#fdeae2; --line:#e7ddcd;
+  --green:#5b8c5a; --blue:#4a7fa5; --gold:#c9a227;
+  --shadow:0 2px 10px rgba(72,58,40,.10);
+  --radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",system-ui,sans-serif;
+  background:var(--bg); color:var(--ink);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,textarea{font-family:inherit}
+
+/* ---------- Header ---------- */
+header{
+  display:flex; align-items:center; gap:18px;
+  padding:12px 20px; background:var(--paper);
+  border-bottom:1px solid var(--line); z-index:50; flex-wrap:wrap;
+}
+.logo{display:flex;align-items:baseline;gap:8px;white-space:nowrap}
+.logo .mark{font-size:26px}
+.logo h1{font-size:21px;letter-spacing:-.5px}
+.logo .en{font-size:11px;color:var(--ink-soft);letter-spacing:1px}
+
+.search-wrap{position:relative;flex:1;min-width:240px;max-width:520px}
+#searchInput{
+  width:100%;padding:11px 16px 11px 42px;border-radius:24px;
+  border:2px solid var(--line);background:var(--bg);font-size:15px;outline:none;
+  transition:border-color .15s;
+}
+#searchInput:focus{border-color:var(--accent);background:#fff}
+.search-wrap .icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px;pointer-events:none}
+#searchResults{
+  position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;
+  border-radius:12px;box-shadow:0 8px 28px rgba(60,45,25,.18);
+  overflow:hidden;display:none;z-index:100;max-height:340px;overflow-y:auto;
+}
+#searchResults.open{display:block}
+.sr-item{display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;text-align:left;border-bottom:1px solid #f3ede2}
+.sr-item:last-child{border-bottom:none}
+.sr-item:hover{background:var(--accent-soft)}
+.sr-thumb{width:38px;height:38px;border-radius:9px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:20px;overflow:hidden;flex-shrink:0}
+.sr-thumb img{width:100%;height:100%;object-fit:cover}
+.sr-name{font-weight:700;font-size:14px}
+.sr-loc{font-size:12px;color:var(--ink-soft)}
+.sr-empty{padding:14px;text-align:center;color:var(--ink-soft);font-size:13px}
+
+.members{display:flex;align-items:center;gap:6px}
+.members .label{font-size:11px;color:var(--ink-soft);margin-right:2px}
+.member-chip{
+  display:flex;align-items:center;gap:5px;padding:6px 12px 6px 8px;border-radius:20px;
+  border:2px solid transparent;background:var(--bg);font-size:13px;font-weight:600;color:var(--ink-soft);
+  transition:all .15s;
+}
+.member-chip .em{font-size:16px}
+.member-chip.active{border-color:var(--member-c,var(--accent));background:#fff;color:var(--ink);box-shadow:var(--shadow)}
+
+/* ---------- Layout ---------- */
+.main{flex:1;display:flex;min-height:0}
+
+/* ---------- Toolbar ---------- */
+.toolbar{
+  width:218px;flex-shrink:0;background:var(--paper);border-right:1px solid var(--line);
+  padding:16px 14px;display:flex;flex-direction:column;gap:16px;overflow-y:auto;
+}
+.tb-title{font-size:11px;font-weight:800;color:var(--ink-soft);letter-spacing:1px;margin-bottom:8px}
+.mode-btn{
+  display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:11px;
+  font-size:14px;font-weight:600;color:var(--ink);border:2px solid transparent;margin-bottom:6px;
+  background:var(--bg);transition:all .12s;text-align:left;
+}
+.mode-btn .em{font-size:18px}
+.mode-btn:hover{background:var(--accent-soft)}
+.mode-btn.active{border-color:var(--accent);background:var(--accent-soft);color:#b34a26}
+#storagePalette{display:none;grid-template-columns:1fr 1fr;gap:6px}
+#storagePalette.open{display:grid}
+.pal-btn{
+  display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px;border-radius:10px;
+  background:var(--bg);font-size:11px;font-weight:600;color:var(--ink-soft);border:2px solid transparent;
+}
+.pal-btn .em{font-size:20px}
+.pal-btn:hover{background:var(--accent-soft)}
+.pal-btn.active{border-color:var(--accent);background:var(--accent-soft);color:#b34a26}
+
+.hint{
+  background:#fff8e8;border:1px solid #eedfb5;border-radius:11px;padding:11px 12px;
+  font-size:12.5px;line-height:1.55;color:#7a6a3f;
+}
+.activity{flex:1;min-height:0;display:flex;flex-direction:column}
+#activityList{list-style:none;overflow-y:auto;display:flex;flex-direction:column;gap:7px}
+#activityList li{
+  font-size:12px;line-height:1.5;color:var(--ink-soft);
+  background:var(--bg);border-radius:9px;padding:7px 10px;
+}
+#activityList li b{color:var(--ink)}
+
+/* ---------- Map ---------- */
+.map-area{flex:1;display:flex;flex-direction:column;min-width:0;padding:18px}
+.map-scroll{flex:1;overflow:auto;border-radius:var(--radius)}
+#map{
+  position:relative;width:940px;height:600px;margin:auto;
+  background:
+    repeating-linear-gradient(0deg,transparent 0 23px,rgba(140,120,90,.07) 23px 24px),
+    repeating-linear-gradient(90deg,transparent 0 23px,rgba(140,120,90,.07) 23px 24px),
+    var(--paper);
+  border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:inset 0 0 40px rgba(140,115,80,.06), var(--shadow);
+  cursor:default; user-select:none;
+}
+#map.mode-room{cursor:crosshair}
+#map.mode-storage{cursor:copy}
+#map.empty::after{
+  content:"✏️  '방 그리기'를 누르고 드래그해서 첫 번째 방을 만들어보세요";
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:var(--ink-soft);font-size:15px;pointer-events:none;
+}
+.room{
+  position:absolute;border-radius:10px;border:2.5px solid;
+  transition:box-shadow .2s;
+}
+.room .room-label{
+  position:absolute;top:6px;left:9px;font-size:12.5px;font-weight:800;opacity:.85;
+  display:flex;align-items:center;gap:5px;pointer-events:none;
+}
+.room .room-del{
+  position:absolute;top:4px;right:5px;width:20px;height:20px;border-radius:50%;
+  font-size:11px;line-height:1;display:none;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.85);color:#a05;
+}
+.room:hover .room-del{display:flex}
+.room.glow{box-shadow:0 0 0 4px rgba(232,102,60,.35)}
+.ghost{
+  position:absolute;border:2.5px dashed var(--accent);border-radius:10px;
+  background:rgba(232,102,60,.08);pointer-events:none;display:none;
+}
+.storage{
+  position:absolute;transform:translate(-50%,-50%);
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  background:none;padding:4px;border-radius:12px;z-index:5;
+}
+.storage .badge{
+  position:relative;width:44px;height:44px;border-radius:13px;background:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:23px;
+  box-shadow:var(--shadow);border:2px solid var(--line);transition:transform .12s,border-color .12s;
+}
+.storage:hover .badge{transform:scale(1.12);border-color:var(--accent)}
+.storage .count{
+  position:absolute;top:-6px;right:-7px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;
+  background:var(--accent);color:#fff;font-size:11px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;
+}
+.storage .st-label{
+  font-size:11px;font-weight:700;color:var(--ink);background:rgba(255,253,248,.9);
+  padding:1px 7px;border-radius:8px;white-space:nowrap;
+}
+@keyframes pulse{
+  0%{box-shadow:0 0 0 0 rgba(232,102,60,.65)}
+  70%{box-shadow:0 0 0 22px rgba(232,102,60,0)}
+  100%{box-shadow:0 0 0 0 rgba(232,102,60,0)}
+}
+.storage.found .badge{border-color:var(--accent);animation:pulse 1.2s ease-out 3}
+.map-footer{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 4px 0;font-size:12.5px;color:var(--ink-soft);
+}
+
+/* ---------- Detail panel ---------- */
+#detailPanel{
+  width:300px;flex-shrink:0;background:var(--paper);border-left:1px solid var(--line);
+  display:none;flex-direction:column;min-height:0;
+}
+#detailPanel.open{display:flex}
+.dp-head{padding:16px 16px 12px;border-bottom:1px solid var(--line);position:relative}
+.dp-close{position:absolute;top:12px;right:12px;font-size:15px;color:var(--ink-soft);width:26px;height:26px;border-radius:50%}
+.dp-close:hover{background:var(--bg)}
+.dp-icon{font-size:30px}
+.dp-name{font-size:17px;font-weight:800;margin-top:2px}
+.dp-loc{font-size:12.5px;color:var(--ink-soft);margin-top:2px}
+.dp-del{margin-top:8px;font-size:11.5px;color:#b0483a;text-decoration:underline}
+.dp-items{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.item-card{
+  display:flex;align-items:center;gap:10px;background:var(--bg);
+  border-radius:11px;padding:8px 10px;
+}
+.item-thumb{width:44px;height:44px;border-radius:9px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;overflow:hidden;flex-shrink:0;border:1px solid var(--line)}
+.item-thumb img{width:100%;height:100%;object-fit:cover}
+.item-body{flex:1;min-width:0}
+.item-name{font-weight:700;font-size:13.5px}
+.item-memo{font-size:11.5px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item-by{font-size:10.5px;color:var(--ink-soft);margin-top:1px}
+.item-del{color:#c0b5a5;font-size:13px;padding:4px}
+.item-del:hover{color:#b0483a}
+.dp-empty{color:var(--ink-soft);font-size:12.5px;text-align:center;padding:18px 0}
+.dp-form{border-top:1px solid var(--line);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.dp-form .row{display:flex;gap:8px}
+.dp-form input[type=text]{
+  flex:1;padding:9px 11px;border-radius:9px;border:1.5px solid var(--line);
+  font-size:13.5px;outline:none;background:#fff;
+}
+.dp-form input[type=text]:focus{border-color:var(--accent)}
+.photo-btn{
+  display:flex;align-items:center;justify-content:center;gap:6px;padding:8px;border-radius:9px;
+  border:1.5px dashed var(--line);font-size:12.5px;color:var(--ink-soft);background:#fff;
+}
+.photo-btn.has{border-style:solid;border-color:var(--green);color:var(--green)}
+.add-btn{
+  padding:10px;border-radius:10px;background:var(--accent);color:#fff;
+  font-size:14px;font-weight:700;transition:opacity .15s;
+}
+.add-btn:hover{opacity:.9}
+
+/* ---------- Modal ---------- */
+#modalWrap{
+  position:fixed;inset:0;background:rgba(50,40,25,.35);display:none;
+  align-items:center;justify-content:center;z-index:200;
+}
+#modalWrap.open{display:flex}
+#modal{
+  width:330px;background:#fff;border-radius:18px;padding:22px;
+  box-shadow:0 20px 60px rgba(40,30,15,.3);
+}
+#modal h3{font-size:16px;margin-bottom:14px}
+#modal .field{margin-bottom:12px}
+#modal label{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:5px}
+#modal input[type=text]{
+  width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--line);
+  font-size:14px;outline:none;
+}
+#modal input[type=text]:focus{border-color:var(--accent)}
+.color-row{display:flex;gap:8px}
+.color-dot{width:28px;height:28px;border-radius:50%;border:3px solid transparent}
+.color-dot.active{border-color:var(--ink)}
+#modal .btns{display:flex;gap:8px;margin-top:16px}
+#modal .btns button{flex:1;padding:11px;border-radius:11px;font-size:14px;font-weight:700}
+.btn-cancel{background:var(--bg);color:var(--ink-soft)}
+.btn-ok{background:var(--accent);color:#fff}
+
+/* ---------- Toast ---------- */
+#toast{
+  position:fixed;bottom:26px;left:50%;transform:translate(-50%,20px);
+  background:var(--ink);color:#fff;padding:11px 20px;border-radius:24px;
+  font-size:13.5px;opacity:0;pointer-events:none;transition:all .25s;z-index:300;
+  max-width:80vw;text-align:center;
+}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><span class="mark">🔍🏠</span><h1>홈즈맵</h1><span class="en">HOMES MAP</span></div>
+  <div class="search-wrap">
+    <span class="icon">🔎</span>
+    <input id="searchInput" type="text" placeholder="어딨지? 물건 이름을 검색해보세요 (예: 손톱깎이)" autocomplete="off">
+    <div id="searchResults"></div>
+  </div>
+  <div class="members" id="memberBar"><span class="label">사용 중:</span></div>
+</header>
+
+<div class="main">
+  <aside class="toolbar">
+    <div>
+      <div class="tb-title">만들기 도구</div>
+      <button class="mode-btn" data-mode="select" id="mb-select"><span class="em">👆</span>둘러보기</button>
+      <button class="mode-btn" data-mode="room" id="mb-room"><span class="em">✏️</span>방 그리기</button>
+      <button class="mode-btn" data-mode="storage" id="mb-storage"><span class="em">📦</span>수납장 놓기</button>
+      <div id="storagePalette"></div>
+    </div>
+    <div class="hint" id="hintBox"></div>
+    <div class="activity">
+      <div class="tb-title">👨‍👩‍👧 가족 활동</div>
+      <ul id="activityList"></ul>
+    </div>
+  </aside>
+
+  <div class="map-area">
+    <div class="map-scroll">
+      <div id="map">
+        <div class="ghost" id="ghost"></div>
+      </div>
+    </div>
+    <div class="map-footer">
+      <span id="stats"></span>
+      <span>홈즈맵 프로토타입 v0.1 — 데이터는 화면을 새로고침하면 초기화됩니다</span>
+    </div>
+  </div>
+
+  <aside id="detailPanel"></aside>
+</div>
+
+<div id="modalWrap"><div id="modal"></div></div>
+<div id="toast"></div>
+<input type="file" id="photoInput" accept="image/*" style="display:none">
+
+<script>
+/* =========================================================
+   홈즈맵 프로토타입 — 모든 데이터는 메모리에만 저장됩니다.
+   ========================================================= */
+'use strict';
+const $ = s => document.querySelector(s);
+
+const STORAGE_TYPES = [
+  {type:'drawer',  em:'🗄️', label:'서랍장'},
+  {type:'closet',  em:'🚪', label:'옷장'},
+  {type:'shelf',   em:'📚', label:'선반'},
+  {type:'fridge',  em:'🧊', label:'냉장고'},
+  {type:'box',     em:'📦', label:'수납박스'},
+  {type:'shoe',    em:'👟', label:'신발장'},
+];
+const ROOM_COLORS = [
+  {fill:'rgba(122,168,116,.16)', border:'#7aa874', name:'초록'},
+  {fill:'rgba(107,142,181,.16)', border:'#6b8eb5', name:'파랑'},
+  {fill:'rgba(224,158,84,.18)',  border:'#d99a50', name:'주황'},
+  {fill:'rgba(186,124,168,.16)', border:'#ba7ca8', name:'분홍'},
+  {fill:'rgba(153,143,101,.18)', border:'#a79a63', name:'카키'},
+];
+
+const state = {
+  members:[
+    {id:'m1', name:'아빠', em:'🧑', color:'#4a7fa5'},
+    {id:'m2', name:'엄마', em:'👩', color:'#c9647f'},
+    {id:'m3', name:'지우', em:'🧒', color:'#5b8c5a'},
+  ],
+  currentMember:'m1',
+  rooms:[
+    {id:'r1', name:'거실',  x:40,  y:40,  w:400, h:300, ci:0},
+    {id:'r2', name:'주방',  x:460, y:40,  w:280, h:220, ci:2},
+    {id:'r3', name:'안방',  x:460, y:280, w:280, h:280, ci:1},
+    {id:'r4', name:'현관',  x:40,  y:360, w:180, h:200, ci:4},
+    {id:'r5', name:'서재',  x:240, y:360, w:200, h:200, ci:3},
+  ],
+  storages:[
+    {id:'s1', roomId:'r1', type:'drawer', name:'TV장 서랍',  x:150, y:290},
+    {id:'s2', roomId:'r2', type:'fridge', name:'냉장고',      x:530, y:110},
+    {id:'s3', roomId:'r2', type:'shelf',  name:'상부장',      x:660, y:110},
+    {id:'s4', roomId:'r3', type:'closet', name:'붙박이장',    x:560, y:360},
+    {id:'s5', roomId:'r4', type:'shoe',   name:'신발장',      x:120, y:450},
+    {id:'s6', roomId:'r5', type:'box',    name:'책상 밑 박스', x:330, y:470},
+  ],
+  items:[
+    {id:'i1', storageId:'s1', name:'손톱깎이',      em:'✂️', memo:'왼쪽 첫 칸',        by:'m2'},
+    {id:'i2', storageId:'s1', name:'리모컨 건전지', em:'🔋', memo:'AA 여분 4개',       by:'m1'},
+    {id:'i3', storageId:'s1', name:'셀로판테이프',  em:'📼', memo:'',                  by:'m3'},
+    {id:'i4', storageId:'s2', name:'참기름',        em:'🫙', memo:'문쪽 아래 칸',      by:'m2'},
+    {id:'i5', storageId:'s3', name:'비상약 상자',   em:'💊', memo:'해열제·밴드',       by:'m2'},
+    {id:'i6', storageId:'s4', name:'여권 (가족)',   em:'🛂', memo:'금고 안',           by:'m1'},
+    {id:'i7', storageId:'s4', name:'겨울 이불',     em:'🛏️', memo:'맨 위 압축팩',     by:'m2'},
+    {id:'i8', storageId:'s5', name:'장우산',        em:'☂️', memo:'',                  by:'m3'},
+    {id:'i9', storageId:'s6', name:'드라이버 세트', em:'🪛', memo:'십자·일자 겸용',    by:'m1'},
+    {id:'i10',storageId:'s6', name:'HDMI 케이블',   em:'🔌', memo:'2m, 여분 1개',      by:'m1'},
+  ],
+  activity:[],
+  mode:'select',
+  palType:'drawer',
+  openStorageId:null,
+  pendingPhoto:null,
+};
+let uid = 100;
+const newId = p => p + (uid++);
+const member = id => state.members.find(m=>m.id===id);
+const room   = id => state.rooms.find(r=>r.id===id);
+const storage= id => state.storages.find(s=>s.id===id);
+const itemsOf= sid => state.items.filter(i=>i.storageId===sid);
+const stMeta = t => STORAGE_TYPES.find(s=>s.type===t);
+const esc = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------- Toast ---------- */
+let toastTimer;
+function toast(msg){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2400);
+}
+
+/* ---------- Activity ---------- */
+function logActivity(html){
+  state.activity.unshift(html);
+  if(state.activity.length>14) state.activity.pop();
+  renderActivity();
+}
+function renderActivity(){
+  $('#activityList').innerHTML = state.activity.length
+    ? state.activity.map(a=>`<li>${a}</li>`).join('')
+    : '<li>아직 활동이 없어요. 가족이 물건을 등록하면 여기에 표시됩니다.</li>';
+}
+
+/* ---------- Members ---------- */
+function renderMembers(){
+  const bar=$('#memberBar');
+  bar.querySelectorAll('.member-chip').forEach(e=>e.remove());
+  state.members.forEach(m=>{
+    const b=document.createElement('button');
+    b.className='member-chip'+(m.id===state.currentMember?' active':'');
+    b.style.setProperty('--member-c', m.color);
+    b.innerHTML=`<span class="em">${m.em}</span>${esc(m.name)}`;
+    b.onclick=()=>{ state.currentMember=m.id; renderMembers(); toast(`${m.em} ${m.name}님으로 전환했어요`); };
+    bar.appendChild(b);
+  });
+}
+
+/* ---------- Mode & palette ---------- */
+const HINTS = {
+  select:'👆 수납장을 클릭하면 그 안의 물건을 보고 등록할 수 있어요. 위쪽 검색창에서 물건을 바로 찾아보세요.',
+  room:'✏️ 맵 위에서 드래그하면 방이 그려져요. 그린 뒤 이름과 색을 정해주세요.',
+  storage:'📦 아래에서 수납장 종류를 고른 뒤, 방 안쪽을 클릭해서 배치하세요.',
+};
+function setMode(mode){
+  state.mode=mode;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode===mode));
+  $('#storagePalette').classList.toggle('open', mode==='storage');
+  $('#hintBox').textContent=HINTS[mode];
+  const map=$('#map');
+  map.classList.toggle('mode-room', mode==='room');
+  map.classList.toggle('mode-storage', mode==='storage');
+}
+document.querySelectorAll('.mode-btn').forEach(b=> b.onclick=()=>setMode(b.dataset.mode));
+function renderPalette(){
+  $('#storagePalette').innerHTML = STORAGE_TYPES.map(s=>
+    `<button class="pal-btn${s.type===state.palType?' active':''}" data-type="${s.type}">
+       <span class="em">${s.em}</span>${s.label}</button>`).join('');
+  document.querySelectorAll('.pal-btn').forEach(b=> b.onclick=()=>{ state.palType=b.dataset.type; renderPalette(); });
+}
+
+/* ---------- Modal ---------- */
+function showModal({title, fields, okText='확인', onOk}){
+  const wrap=$('#modalWrap'), modal=$('#modal');
+  modal.innerHTML = `<h3>${title}</h3>` +
+    fields.map(f=>{
+      if(f.type==='color'){
+        return `<div class="field"><label>${f.label}</label><div class="color-row">${
+          ROOM_COLORS.map((c,i)=>`<button class="color-dot${i===0?' active':''}" data-ci="${i}" style="background:${c.border}" title="${c.name}"></button>`).join('')
+        }</div></div>`;
+      }
+      return `<div class="field"><label>${f.label}</label>
+        <input type="text" id="mf-${f.key}" placeholder="${f.ph||''}" value="${esc(f.value||'')}" maxlength="20"></div>`;
+    }).join('') +
+    `<div class="btns"><button class="btn-cancel">취소</button><button class="btn-ok">${okText}</button></div>`;
+  wrap.classList.add('open');
+  let ci=0;
+  modal.querySelectorAll('.color-dot').forEach(d=> d.onclick=()=>{
+    modal.querySelectorAll('.color-dot').forEach(x=>x.classList.remove('active'));
+    d.classList.add('active'); ci=+d.dataset.ci;
+  });
+  const close=()=>wrap.classList.remove('open');
+  modal.querySelector('.btn-cancel').onclick=()=>{ close(); if(onOk) onOk(null); };
+  modal.querySelector('.btn-ok').onclick=()=>{
+    const vals={ci};
+    let ok=true;
+    fields.forEach(f=>{
+      if(f.type!=='color'){
+        const v=modal.querySelector('#mf-'+f.key).value.trim();
+        if(f.required && !v){ ok=false; }
+        vals[f.key]=v;
+      }
+    });
+    if(!ok){ toast('이름을 입력해주세요'); return; }
+    close(); onOk(vals);
+  };
+  const first=modal.querySelector('input[type=text]');
+  if(first){ first.focus(); first.select();
+    first.onkeydown=e=>{ if(e.key==='Enter') modal.querySelector('.btn-ok').click(); };
+  }
+}
+
+/* ---------- Render map ---------- */
+function renderMap(){
+  const map=$('#map');
+  map.querySelectorAll('.room,.storage').forEach(e=>e.remove());
+  map.classList.toggle('empty', state.rooms.length===0);
+
+  state.rooms.forEach(r=>{
+    const c=ROOM_COLORS[r.ci%ROOM_COLORS.length];
+    const el=document.createElement('div');
+    el.className='room'; el.dataset.id=r.id;
+    el.style.cssText=`left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;background:${c.fill};border-color:${c.border}`;
+    el.innerHTML=`<span class="room-label" style="color:${c.border}">🏷️ ${esc(r.name)}</span>
+      <button class="room-del" title="방 삭제">✕</button>`;
+    el.querySelector('.room-del').onclick=e=>{ e.stopPropagation(); deleteRoom(r.id); };
+    map.appendChild(el);
+  });
+
+  state.storages.forEach(s=>{
+    const meta=stMeta(s.type), n=itemsOf(s.id).length;
+    const el=document.createElement('button');
+    el.className='storage'; el.dataset.id=s.id;
+    el.style.cssText=`left:${s.x}px;top:${s.y}px`;
+    el.innerHTML=`<span class="badge">${meta.em}${n?`<span class="count">${n}</span>`:''}</span>
+      <span class="st-label">${esc(s.name)}</span>`;
+    el.onclick=e=>{ e.stopPropagation(); openStorage(s.id); };
+    map.appendChild(el);
+  });
+
+  $('#stats').textContent=`🏠 방 ${state.rooms.length} · 📦 수납장 ${state.storages.length} · 🧸 물건 ${state.items.length}개 등록됨`;
+}
+
+function deleteRoom(rid){
+  const r=room(rid);
+  const sids=state.storages.filter(s=>s.roomId===rid).map(s=>s.id);
+  state.storages=state.storages.filter(s=>s.roomId!==rid);
+  state.items=state.items.filter(i=>!sids.includes(i.storageId));
+  state.rooms=state.rooms.filter(x=>x.id!==rid);
+  if(sids.includes(state.openStorageId)) closePanel();
+  renderMap(); toast(`'${r.name}' 방과 그 안의 수납장을 삭제했어요`);
+}
+
+/* ---------- Map interactions (draw room / place storage) ---------- */
+const map=$('#map'), ghost=$('#ghost');
+let drawing=null;
+function mapPos(e){
+  const rect=map.getBoundingClientRect();
+  return {x:Math.round(e.clientX-rect.left), y:Math.round(e.clientY-rect.top)};
+}
+map.addEventListener('mousedown', e=>{
+  if(state.mode!=='room') return;
+  drawing=mapPos(e);
+  ghost.style.display='block';
+  ghost.style.cssText+=`;left:${drawing.x}px;top:${drawing.y}px;width:0;height:0`;
+});
+window.addEventListener('mousemove', e=>{
+  if(!drawing) return;
+  const p=mapPos(e);
+  const x=Math.min(drawing.x,p.x), y=Math.min(drawing.y,p.y);
+  const w=Math.abs(p.x-drawing.x), h=Math.abs(p.y-drawing.y);
+  ghost.style.left=x+'px'; ghost.style.top=y+'px';
+  ghost.style.width=w+'px'; ghost.style.height=h+'px';
+});
+window.addEventListener('mouseup', e=>{
+  if(!drawing) return;
+  const p=mapPos(e);
+  const x=Math.min(drawing.x,p.x), y=Math.min(drawing.y,p.y);
+  const w=Math.abs(p.x-drawing.x), h=Math.abs(p.y-drawing.y);
+  drawing=null; ghost.style.display='none';
+  if(w<60||h<50){ if(w>8||h>8) toast('조금 더 크게 드래그해주세요'); return; }
+  showModal({
+    title:'✏️ 새 방 만들기',
+    fields:[
+      {key:'name', label:'방 이름', ph:'예: 거실, 아이방', required:true},
+      {type:'color', label:'색상'},
+    ],
+    okText:'방 만들기',
+    onOk:v=>{
+      if(!v) return;
+      state.rooms.push({id:newId('r'), name:v.name, x, y, w, h, ci:v.ci});
+      renderMap(); setMode('storage');
+      toast(`'${v.name}' 방이 생겼어요! 이제 수납장을 놓아보세요`);
+    }
+  });
+});
+map.addEventListener('click', e=>{
+  if(state.mode!=='storage') return;
+  const p=mapPos(e);
+  const r=state.rooms.find(r=> p.x>=r.x && p.x<=r.x+r.w && p.y>=r.y && p.y<=r.y+r.h);
+  if(!r){ toast('방 안쪽을 클릭해서 배치해주세요'); return; }
+  const meta=stMeta(state.palType);
+  showModal({
+    title:`${meta.em} ${r.name}에 ${meta.label} 놓기`,
+    fields:[{key:'name', label:'수납장 이름', ph:`예: ${r.name} ${meta.label}`, value:`${r.name} ${meta.label}`, required:true}],
+    okText:'배치하기',
+    onOk:v=>{
+      if(!v) return;
+      const s={id:newId('s'), roomId:r.id, type:state.palType, name:v.name, x:p.x, y:p.y};
+      state.storages.push(s);
+      renderMap(); openStorage(s.id);
+      const m=member(state.currentMember);
+      logActivity(`${m.em} <b>${esc(m.name)}</b>님이 ${esc(r.name)}에 <b>${esc(v.name)}</b>을(를) 만들었어요`);
+    }
+  });
+});
+
+/* ---------- Detail panel ---------- */
+function closePanel(){ state.openStorageId=null; $('#detailPanel').classList.remove('open'); }
+function openStorage(sid, highlight){
+  state.openStorageId=sid; state.pendingPhoto=null;
+  const s=storage(sid); if(!s) return;
+  const meta=stMeta(s.type), r=room(s.roomId);
+  const items=itemsOf(sid);
+  const panel=$('#detailPanel');
+  panel.innerHTML=`
+    <div class="dp-head">
+      <button class="dp-close">✕</button>
+      <div class="dp-icon">${meta.em}</div>
+      <div class="dp-name">${esc(s.name)}</div>
+      <div class="dp-loc">📍 ${esc(r?r.name:'위치 미지정')} · ${meta.label} · 물건 ${items.length}개</div>
+      <button class="dp-del">이 수납장 삭제</button>
+    </div>
+    <div class="dp-items">
+      ${items.length ? items.map(i=>{
+        const m=member(i.by);
+        return `<div class="item-card">
+          <div class="item-thumb">${i.photo?`<img src="${i.photo}" alt="">`:(i.em||'📦')}</div>
+          <div class="item-body">
+            <div class="item-name">${esc(i.name)}</div>
+            ${i.memo?`<div class="item-memo">${esc(i.memo)}</div>`:''}
+            <div class="item-by">${m?m.em+' '+esc(m.name):''} 등록</div>
+          </div>
+          <button class="item-del" data-id="${i.id}" title="삭제">🗑️</button>
+        </div>`;
+      }).join('') : '<div class="dp-empty">아직 등록된 물건이 없어요.<br>아래에서 첫 물건을 등록해보세요!</div>'}
+    </div>
+    <div class="dp-form">
+      <input type="text" id="ni-name" placeholder="물건 이름 (예: 손톱깎이)" maxlength="30">
+      <input type="text" id="ni-memo" placeholder="메모 — 몇 번째 칸인지 등 (선택)" maxlength="40">
+      <div class="row">
+        <button class="photo-btn" id="ni-photo">📷 사진 추가 (선택)</button>
+      </div>
+      <button class="add-btn" id="ni-add">＋ 물건 등록</button>
+    </div>`;
+  panel.classList.add('open');
+  panel.querySelector('.dp-close').onclick=closePanel;
+  panel.querySelector('.dp-del').onclick=()=>{
+    state.items=state.items.filter(i=>i.storageId!==sid);
+    state.storages=state.storages.filter(x=>x.id!==sid);
+    closePanel(); renderMap(); toast(`'${s.name}' 수납장을 삭제했어요`);
+  };
+  panel.querySelectorAll('.item-del').forEach(b=> b.onclick=()=>{
+    const it=state.items.find(i=>i.id===b.dataset.id);
+    state.items=state.items.filter(i=>i.id!==b.dataset.id);
+    renderMap(); openStorage(sid);
+    toast(`'${it.name}' 삭제됨`);
+  });
+  panel.querySelector('#ni-photo').onclick=()=>$('#photoInput').click();
+  panel.querySelector('#ni-add').onclick=addItemFromForm;
+  panel.querySelector('#ni-name').onkeydown=e=>{ if(e.key==='Enter') addItemFromForm(); };
+  if(highlight) flashStorage(sid);
+}
+$('#photoInput').addEventListener('change', e=>{
+  const f=e.target.files[0]; e.target.value='';
+  if(!f) return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    state.pendingPhoto=reader.result;
+    const btn=$('#ni-photo');
+    if(btn){ btn.textContent='✅ 사진 첨부됨'; btn.classList.add('has'); }
+  };
+  reader.readAsDataURL(f);
+});
+function addItemFromForm(){
+  const sid=state.openStorageId; if(!sid) return;
+  const name=$('#ni-name').value.trim();
+  if(!name){ toast('물건 이름을 입력해주세요'); return; }
+  const memo=$('#ni-memo').value.trim();
+  state.items.push({id:newId('i'), storageId:sid, name, memo, photo:state.pendingPhoto, em:'📦', by:state.currentMember});
+  state.pendingPhoto=null;
+  const s=storage(sid), r=room(s.roomId), m=member(state.currentMember);
+  logActivity(`${m.em} <b>${esc(m.name)}</b>님이 ${esc(r?r.name:'')} ${esc(s.name)}에 <b>'${esc(name)}'</b> 등록`);
+  renderMap(); openStorage(sid);
+  toast(`'${name}' 등록 완료! 이제 검색으로 바로 찾을 수 있어요`);
+}
+
+/* ---------- Search ---------- */
+function flashStorage(sid){
+  const el=map.querySelector(`.storage[data-id="${sid}"]`);
+  const s=storage(sid);
+  if(!el||!s) return;
+  map.querySelectorAll('.storage.found').forEach(x=>x.classList.remove('found'));
+  map.querySelectorAll('.room.glow').forEach(x=>x.classList.remove('glow'));
+  el.classList.add('found');
+  const rEl=map.querySelector(`.room[data-id="${s.roomId}"]`);
+  if(rEl) rEl.classList.add('glow');
+  el.scrollIntoView({behavior:'smooth', block:'center', inline:'center'});
+  setTimeout(()=>{ el.classList.remove('found'); if(rEl) rEl.classList.remove('glow'); }, 4000);
+}
+const searchInput=$('#searchInput'), searchResults=$('#searchResults');
+function doSearch(){
+  const q=searchInput.value.trim().toLowerCase();
+  if(!q){ searchResults.classList.remove('open'); return; }
+  const hits=state.items.filter(i=>
+    i.name.toLowerCase().includes(q) || (i.memo&&i.memo.toLowerCase().includes(q))
+  ).slice(0,8);
+  searchResults.innerHTML = hits.length ? hits.map(i=>{
+    const s=storage(i.storageId), r=s?room(s.roomId):null;
+    return `<button class="sr-item" data-sid="${s?s.id:''}">
+      <span class="sr-thumb">${i.photo?`<img src="${i.photo}" alt="">`:(i.em||'📦')}</span>
+      <span><span class="sr-name">${esc(i.name)}</span><br>
+      <span class="sr-loc">📍 ${esc(r?r.name:'?')} → ${esc(s?s.name:'?')}${i.memo?' · '+esc(i.memo):''}</span></span>
+    </button>`;
+  }).join('') : `<div class="sr-empty">'${esc(q)}' 검색 결과가 없어요 😅<br>수납장을 클릭해 등록해두면 다음엔 바로 찾아요!</div>`;
+  searchResults.classList.add('open');
+  searchResults.querySelectorAll('.sr-item').forEach(b=> b.onclick=()=>{
+    searchResults.classList.remove('open'); searchInput.blur();
+    setMode('select');
+    openStorage(b.dataset.sid, true);
+  });
+}
+searchInput.addEventListener('input', doSearch);
+searchInput.addEventListener('focus', doSearch);
+searchInput.addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ const first=searchResults.querySelector('.sr-item'); if(first) first.click(); }
+  if(e.key==='Escape'){ searchResults.classList.remove('open'); searchInput.blur(); }
+});
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.search-wrap')) searchResults.classList.remove('open');
+});
+
+/* ---------- Init ---------- */
+renderMembers();
+renderPalette();
+renderActivity();
+setMode('select');
+renderMap();
+logActivity('👩 <b>엄마</b>님이 붙박이장에 <b>\'겨울 이불\'</b> 등록');
+logActivity('🧒 <b>지우</b>님이 신발장에 <b>\'장우산\'</b> 등록');
+logActivity('🧑 <b>아빠</b>님이 책상 밑 박스에 <b>\'드라이버 세트\'</b> 등록');
+toast('🔍 홈즈맵에 오신 걸 환영해요! 검색창에 \'손톱깎이\'를 검색해보세요');
+</script>
+</body>
+</html>
