@@ -4,11 +4,25 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { keys } from '@/lib/keys'
 import { store } from '@/lib/store'
+import { syncNow } from '@/lib/sync'
+import { decryptField } from '@/lib/crypto'
 import { createClient } from '@/lib/supabase/client'
+import { Header } from '@/components/Header'
+import { MapCanvas } from '@/components/MapCanvas'
+import type { Room, Storage, Item, DecItem, FamilyMember } from '@/lib/types'
+
+type BootData = {
+  familyId: string
+  rooms: Room[]
+  storages: Storage[]
+  decItems: DecItem[]
+  members: FamilyMember[]
+  offline: boolean
+}
 
 export default function AppHomePage() {
   const router = useRouter()
-  const [ready, setReady] = useState(false)
+  const [data, setData] = useState<BootData | null>(null)
   const [error, setError] = useState(false)
 
   useEffect(() => {
@@ -28,9 +42,9 @@ export default function AppHomePage() {
           }
         }
 
-        // 2) 이번 세션에 이미 잠금해제된 상태면 바로 앱 화면
+        // 2) 이번 세션에 이미 잠금해제된 상태면 로컬 스토어를 하이드레이트하고 지도를 렌더
         if (keys.hasFDK()) {
-          setReady(true)
+          await boot()
           return
         }
 
@@ -48,13 +62,64 @@ export default function AppHomePage() {
           router.replace('/login')
           return
         }
-        const { data } = await supabase.from('family_members').select('id').eq('user_id', user.id).limit(1)
-        router.replace(data && data.length > 0 ? '/unlock' : '/onboarding')
+        const { data: membershipRows } = await supabase.from('family_members').select('id').eq('user_id', user.id).limit(1)
+        router.replace(membershipRows && membershipRows.length > 0 ? '/unlock' : '/onboarding')
       } catch {
         setError(true)
       }
     })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router])
+
+  async function boot() {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.replace('/login'); return }
+    const { data: fm } = await supabase.from('family_members').select('family_id').eq('user_id', user.id).limit(1)
+    const familyId = fm?.[0]?.family_id
+    if (!familyId) { setError(true); return }
+
+    let offline = false
+    try {
+      await syncNow(familyId)
+    } catch {
+      offline = true // 서버 동기화 실패 — 로컬 스토어 데이터로 그대로 진행(로컬 우선 원칙)
+    }
+    await loadLocalData(familyId, offline)
+  }
+
+  async function loadLocalData(familyId: string, offline: boolean) {
+    const fdk = keys.getFDK()
+    if (!fdk) return
+    const [rooms, storages, items, members] = await Promise.all([
+      store.allActive<Room>('rooms'),
+      store.allActive<Storage>('storages'),
+      store.allActive<Item>('items'),
+      store.getAll<FamilyMember>('members'),
+    ])
+    const decItems: DecItem[] = await Promise.all(
+      items.map(async (it) => {
+        const { enc_name, enc_memo, ...rest } = it
+        return {
+          ...rest,
+          name: await decryptField(fdk, enc_name),
+          memo: enc_memo ? await decryptField(fdk, enc_memo) : '',
+        }
+      })
+    )
+    setData({ familyId, rooms, storages, decItems, members, offline })
+  }
+
+  // 앱으로 포커스가 돌아올 때 백그라운드로 재동기화(로컬 우선 — 실패해도 화면은 그대로 유지)
+  const familyId = data?.familyId
+  useEffect(() => {
+    if (!familyId) return
+    const onFocus = () => {
+      syncNow(familyId).then(() => loadLocalData(familyId, false)).catch(() => {})
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [familyId])
 
   if (error) {
     return (
@@ -76,18 +141,15 @@ export default function AppHomePage() {
     )
   }
 
-  if (!ready) return null
+  if (!data) return null
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100dvh',
-      }}
-    >
-      <p>지도 준비 중</p>
-    </div>
+    <>
+      <Header familyId={data.familyId} members={data.members} />
+      {data.offline && <div className="offline-notice">오프라인 — 저장된 데이터로 표시 중</div>}
+      <div className="main">
+        <MapCanvas rooms={data.rooms} storages={data.storages} decItems={data.decItems} />
+      </div>
+    </>
   )
 }
