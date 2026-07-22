@@ -31,8 +31,12 @@ export default function OnboardingPage() {
 
   async function handleCopy() {
     if (!recoveryCode) return
-    await navigator.clipboard.writeText(recoveryCode)
-    setCopied(true)
+    try {
+      await navigator.clipboard.writeText(recoveryCode)
+      setCopied(true)
+    } catch {
+      // 복사 실패해도 코드는 화면에 그대로 보이므로 무시
+    }
   }
 
   return (
@@ -148,7 +152,7 @@ export default function OnboardingPage() {
             </p>
             <button
               type="button"
-              onClick={() => router.push('/')}
+              onClick={() => router.replace('/')}
               style={{ padding: '10px', fontSize: '16px' }}
             >
               확인

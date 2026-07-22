@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { joinFamilyWithKey } from '@/lib/keys'
 
-type Phase = 'checking' | 'invalid' | 'loading-family' | 'family-error' | 'ready'
+type Phase = 'checking' | 'invalid' | 'loading-family' | 'family-error' | 'ready' | 'boot-error'
 
 export default function InvitePage() {
   const { token } = useParams<{ token: string }>()
@@ -20,31 +20,37 @@ export default function InvitePage() {
 
   useEffect(() => {
     ;(async () => {
-      const match = location.hash.match(/^#k=(.+)$/)
-      if (!match || !match[1]) {
-        setPhase('invalid')
-        return
-      }
-      const k = match[1]
-      // 프래그먼트는 로그인 리다이렉트를 살아남지 못하므로 진입 즉시 스테이징
-      sessionStorage.setItem('pendingInvite', JSON.stringify({ token, k }))
-      setFdkCode(k)
+      try {
+        const match = location.hash.match(/^#k=(.+)$/)
+        if (!match || !match[1]) {
+          setPhase('invalid')
+          return
+        }
+        const k = match[1]
+        // 프래그먼트는 로그인 리다이렉트를 살아남지 못하므로 진입 즉시 스테이징
+        sessionStorage.setItem('pendingInvite', JSON.stringify({ token, k }))
+        setFdkCode(k)
 
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          router.push('/login')
+          return
+        }
+        setPhase('loading-family')
+        const { data, error } = await supabase.rpc('get_invite_family', { p_token: token })
+        const row = Array.isArray(data) ? data[0] : null
+        if (error || !row) {
+          // 죽은 초대 — 스테이징을 지워야 (app)/page.tsx가 여기로 계속 되돌려보내지 않음
+          sessionStorage.removeItem('pendingInvite')
+          setPhase('family-error')
+          return
+        }
+        setFamilyName(row.family_name)
+        setPhase('ready')
+      } catch {
+        setPhase('boot-error')
       }
-      setPhase('loading-family')
-      const { data, error } = await supabase.rpc('get_invite_family', { p_token: token })
-      const row = Array.isArray(data) ? data[0] : null
-      if (error || !row) {
-        setPhase('family-error')
-        return
-      }
-      setFamilyName(row.family_name)
-      setPhase('ready')
     })()
   }, [token, router])
 
@@ -56,7 +62,7 @@ export default function InvitePage() {
     try {
       await joinFamilyWithKey(token, fdkCode, displayName, passphrase)
       sessionStorage.removeItem('pendingInvite')
-      router.push('/')
+      router.replace('/')
     } catch {
       setErrorMsg('참여에 실패했어요. 초대 링크가 만료되었을 수 있어요.')
       setSubmitting(false)
@@ -99,6 +105,20 @@ export default function InvitePage() {
           <p style={{ color: '#666', fontSize: '14px' }}>
             링크를 보낸 가족 구성원에게 새 초대 링크를 다시 받아주세요.
           </p>
+        </>
+      )}
+
+      {phase === 'boot-error' && (
+        <>
+          <h1 style={{ fontSize: '20px', margin: 0 }}>연결에 문제가 있어요</h1>
+          <p style={{ color: '#666', fontSize: '14px' }}>새로고침 해주세요.</p>
+          <button
+            type="button"
+            onClick={() => location.reload()}
+            style={{ padding: '10px', fontSize: '16px' }}
+          >
+            다시 시도
+          </button>
         </>
       )}
 
