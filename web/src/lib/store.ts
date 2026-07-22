@@ -3,10 +3,8 @@ import * as idb from './idb'
 import type { Table } from './idb'
 
 type Row = { id: string; deleted_at?: string | null }
-
-async function dirtyIds(table: Table): Promise<string[]> {
-  return (await idb.get<string[]>('dirty', table)) ?? []
-}
+type DirtyEntry = { table: Table; id: string }
+const dirtyKey = (table: Table, id: string) => `${table}:${id}`
 
 export const store = {
   getAll<T extends Row>(table: Table): Promise<T[]> {
@@ -18,23 +16,21 @@ export const store = {
   async allActive<T extends Row>(table: Table): Promise<T[]> {
     return (await idb.getAll<T>(table)).filter(r => r.deleted_at == null)
   },
-  // dirty: true면 sync 엔진이 나중에 서버로 밀어올릴 대상으로 표시
+  // dirty: true면 sync 엔진이 나중에 서버로 밀어올릴 대상으로 표시.
+  // row당 하나의 dirty 엔트리(key=`${table}:${id}`)에 단일 put — read-modify-write 없이 원자적
   async putLocal<T extends Row>(table: Table, row: T, { dirty }: { dirty: boolean }): Promise<void> {
     await idb.put(table, row)
-    if (dirty) {
-      const ids = await dirtyIds(table)
-      if (!ids.includes(row.id)) await idb.put('dirty', [...ids, row.id], table)
-    }
+    if (dirty) await idb.put('dirty', { table, id: row.id } satisfies DirtyEntry, dirtyKey(table, row.id))
   },
   async dirtyRows<T extends Row>(table: Table): Promise<T[]> {
-    const ids = new Set(await dirtyIds(table))
+    const entries = await idb.getAll<DirtyEntry>('dirty')
+    const ids = new Set(entries.filter(e => e.table === table).map(e => e.id))
     if (ids.size === 0) return []
     return (await idb.getAll<T>(table)).filter(r => ids.has(r.id))
   },
-  // 서버 push 성공 후 호출. 시그니처: clearDirty(table, ids) — 테이블별 dirty 집합이라 table 없이는 대상 스토어를 특정할 수 없음
+  // 서버 push 성공 후 호출. row별 엔트리를 개별 delete — 다른 row의 동시 putLocal과 경합 없음
   async clearDirty(table: Table, ids: string[]): Promise<void> {
-    const remaining = (await dirtyIds(table)).filter(id => !ids.includes(id))
-    await idb.put('dirty', remaining, table)
+    await Promise.all(ids.map(id => idb.del('dirty', dirtyKey(table, id))))
   },
   getMeta<T = unknown>(key: string): Promise<T | undefined> {
     return idb.get<T>('meta', key)

@@ -19,7 +19,7 @@ function openDB(): Promise<IDBDatabase> {
         const db = req.result
         for (const t of TABLES) db.createObjectStore(t, { keyPath: 'id' })
         db.createObjectStore('meta') // out-of-line key: getMeta/setMeta(key, value)
-        db.createObjectStore('dirty') // out-of-line key: table -> string[] of pending row ids
+        db.createObjectStore('dirty') // out-of-line key `${table}:${id}` -> { table, id }, one entry per dirty row (atomic put/del, no read-modify-write)
       }
       req.onsuccess = () => resolve(req.result)
       req.onerror = () => reject(req.error)
@@ -43,7 +43,7 @@ async function getStore(name: StoreName, mode: IDBTransactionMode): Promise<IDBO
 export async function get<T>(name: StoreName, key: IDBValidKey): Promise<T | undefined> {
   return wrap<T | undefined>((await getStore(name, 'readonly')).get(key))
 }
-export async function getAll<T>(name: Table): Promise<T[]> {
+export async function getAll<T>(name: StoreName): Promise<T[]> {
   return wrap<T[]>((await getStore(name, 'readonly')).getAll())
 }
 export async function put(name: StoreName, value: unknown, key?: IDBValidKey): Promise<void> {
