@@ -1,24 +1,22 @@
 import { describe, it, expect } from 'vitest'
-import { groupItemsByCompartment } from './compartments'
+import { childCompartments, descendantIds } from './compartments'
 
-const cmps = [{ id: 'a', name: '윗서랍' }, { id: 'b', name: '아래서랍' }]
-const item = (id: string, compartment_id: string | null) => ({ id, compartment_id })
+// 서랍장 > 위/아래, 아래 > 아래-앞/아래-뒤
+const cmps = [
+  { id: 'top', name: '위' },
+  { id: 'bot', name: '아래' },
+  { id: 'bf', name: '아래-앞', parent_id: 'bot' },
+  { id: 'bb', name: '아래-뒤', parent_id: 'bot' },
+]
 
-describe('groupItemsByCompartment', () => {
-  it('칸 순서 유지 + 빈 칸도 그룹으로', () => {
-    const g = groupItemsByCompartment([item('1', 'b'), item('2', 'a')], cmps)
-    expect(g.map((x) => x.compartment?.id)).toEqual(['a', 'b']) // 칸 배열 순서
-    expect(g[0].items.map((i) => i.id)).toEqual(['2'])
-    expect(g[1].items.map((i) => i.id)).toEqual(['1'])
+describe('compartments tree', () => {
+  it('childCompartments: 직속 자식만, 순서 유지', () => {
+    expect(childCompartments(cmps, null).map((c) => c.id)).toEqual(['top', 'bot'])
+    expect(childCompartments(cmps, 'bot').map((c) => c.id)).toEqual(['bf', 'bb'])
+    expect(childCompartments(cmps, 'top')).toEqual([])
   })
-  it('칸 없음/삭제된 칸 물건은 미분류로 폴백', () => {
-    const g = groupItemsByCompartment([item('1', null), item('2', 'zzz'), item('3', 'a')], cmps)
-    const unfiled = g.find((x) => x.compartment === null)
-    expect(unfiled?.items.map((i) => i.id)).toEqual(['1', '2'])
-    expect(g[0].items.map((i) => i.id)).toEqual(['3'])
-  })
-  it('미분류 물건이 없으면 미분류 그룹 없음', () => {
-    const g = groupItemsByCompartment([item('1', 'a')], cmps)
-    expect(g.some((x) => x.compartment === null)).toBe(false)
+  it('descendantIds: 자기 + 모든 후손', () => {
+    expect(descendantIds(cmps, 'bot').sort()).toEqual(['bb', 'bf', 'bot'])
+    expect(descendantIds(cmps, 'top')).toEqual(['top'])
   })
 })

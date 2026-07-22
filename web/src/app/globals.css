@@ -292,6 +292,53 @@ header{
   background:var(--surface);color:var(--ink);font-size:13.5px;outline:none;
 }
 .cmp-select:focus{border-color:var(--accent)}
+
+/* ---------- 뷰 토글 + 목록(트리) 뷰 ---------- */
+.viewtabs{display:flex;gap:6px;padding:10px 16px;background:var(--paper);border-bottom:1px solid var(--line);flex-shrink:0}
+.viewtabs button{padding:7px 16px;border-radius:var(--r-pill,9999px);font-size:13.5px;font-weight:700;background:var(--bg);color:var(--ink-soft);border:1.5px solid transparent}
+.viewtabs button.active{background:var(--accent-soft);color:var(--accent-ink);border-color:var(--accent)}
+
+.tree-view{flex:1;min-height:0;overflow-y:auto;padding:12px}
+.home-tree{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:1px}
+.tree-empty{color:var(--ink-soft);font-size:13px;text-align:center;padding:24px 0}
+
+.tree-row{display:flex;align-items:center;gap:6px;padding:6px 4px;border-radius:8px}
+.tree-row:hover{background:var(--bg)}
+.tree-emoji{font-size:15px;flex-shrink:0}
+.tree-name{flex:1;min-width:0;font-size:14px;font-weight:700;color:var(--ink);background:transparent;border:none;border-bottom:1.5px solid transparent;outline:none;padding:2px 0}
+.tree-name:focus{border-bottom-color:var(--accent)}
+
+.cmp-tree{display:flex;flex-direction:column;gap:1px;padding:1px 0}
+.cmp-node{display:flex;flex-direction:column}
+.cmp-row{display:flex;align-items:center;gap:6px;padding:4px;border-radius:8px}
+.cmp-row:hover{background:var(--bg)}
+.cmp-twist{font-size:11px;color:var(--ink-soft);width:16px;flex-shrink:0;text-align:center}
+
+.del-confirm{display:flex;gap:4px;flex-shrink:0}
+.del-confirm button{font-size:11px;padding:2px 8px;border-radius:7px;font-weight:700}
+.del-yes{background:var(--danger);color:#fff}
+.btn-ghost{background:var(--bg);color:var(--ink-soft)}
+
+.tree-item{display:flex;align-items:center;gap:8px;padding:4px;border-radius:8px}
+.tree-item:hover{background:var(--bg)}
+.tree-item-thumb{width:26px;height:26px;border-radius:7px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:15px;overflow:hidden;flex-shrink:0}
+.tree-item-thumb img{width:100%;height:100%;object-fit:cover}
+.tree-item-body{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}
+.tree-item-name{font-size:13px;font-weight:600;color:var(--ink)}
+.tree-item-memo{font-size:11px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tree-item-by{font-size:10px;color:var(--ink-soft)}
+
+.node-add{display:flex;gap:6px;padding:3px 4px}
+.node-add button{font-size:11.5px;font-weight:700;color:var(--accent-ink);padding:3px 9px;border-radius:7px;background:var(--accent-soft)}
+.node-add button:hover{opacity:.85}
+.node-add-form{display:flex;flex-wrap:wrap;gap:4px;padding:4px;align-items:center}
+.node-add-form input[type=text]{padding:6px 9px;border-radius:8px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-size:12.5px;outline:none;min-width:100px;flex:1}
+.node-add-form input[type=text]:focus{border-color:var(--accent)}
+.node-add-form button{font-size:12px;font-weight:700;padding:6px 10px;border-radius:8px;background:var(--accent);color:#fff;flex-shrink:0}
+.node-add-form button.btn-ghost{background:var(--bg);color:var(--ink-soft)}
+.node-add-form button:disabled{opacity:.5}
+.node-photo{display:inline-flex;align-items:center;font-size:12px;padding:6px 10px;border-radius:8px;border:1.5px dashed var(--line);color:var(--ink-soft);cursor:pointer;flex-shrink:0}
+.node-photo.has{border-style:solid;border-color:var(--green);color:var(--green)}
 .dp-form{border-top:1px solid var(--line);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
 .dp-form .row{display:flex;gap:8px}
 .dp-form input[type=text]{

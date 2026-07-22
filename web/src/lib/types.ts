@@ -9,7 +9,8 @@ export type Room = {
   color_index: number; updated_at: string; deleted_at: string | null
 }
 // 수납장 칸. 방·수납장 이름과 같은 급의 구조 라벨이라 평문(암호화 안 함). 수납장 행에 목록으로 저장.
-export type Compartment = { id: UUID; name: string }
+// parent_id로 무한 중첩(트리). null/undefined = 수납장 직속 최상위 칸.
+export type Compartment = { id: UUID; name: string; parent_id?: UUID | null }
 export type Storage = {
   id: UUID; family_id: UUID; room_id: UUID; type: StorageTypeKey; name: string
   x: number; y: number; compartments: Compartment[]; updated_at: string; deleted_at: string | null
