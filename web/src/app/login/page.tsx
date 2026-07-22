@@ -1,20 +1,22 @@
 'use client'
 
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 type Status = 'idle' | 'sending' | 'sent' | 'error'
 
+// 마운트 시 1회만 URL을 읽으면 되므로 effect 대신 지연 초기값으로 처리(SSR에서는 location이 없어 빈 문자열)
+function initialErrorMsg(): string {
+  if (typeof window === 'undefined') return ''
+  return new URLSearchParams(window.location.search).get('error') === 'auth'
+    ? '로그인 링크가 만료되었거나 이미 사용되었어요. 다시 시도해주세요.'
+    : ''
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState<Status>('idle')
-  const [errorMsg, setErrorMsg] = useState('')
-
-  useEffect(() => {
-    if (new URLSearchParams(location.search).get('error') === 'auth') {
-      setErrorMsg('로그인 링크가 만료되었거나 이미 사용되었어요. 다시 시도해주세요.')
-    }
-  }, [])
+  const [errorMsg, setErrorMsg] = useState(initialErrorMsg)
 
   async function handleEmailLogin(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()

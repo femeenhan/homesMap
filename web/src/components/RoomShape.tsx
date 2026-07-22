@@ -3,14 +3,15 @@ import { ROOM_COLORS } from '@/lib/types'
 
 type Props = {
   room: Room
+  glow?: boolean
   onDelete?: (room: Room) => void
 }
 
-export function RoomShape({ room, onDelete }: Props) {
+export function RoomShape({ room, glow, onDelete }: Props) {
   const color = ROOM_COLORS[room.color_index % ROOM_COLORS.length]
   return (
     <div
-      className="room"
+      className={`room${glow ? ' glow' : ''}`}
       style={{
         left: room.x,
         top: room.y,

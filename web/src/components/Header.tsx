@@ -2,15 +2,20 @@
 
 import { useState } from 'react'
 import { createInviteLink } from '@/lib/keys'
-import type { FamilyMember } from '@/lib/types'
+import type { DecItem, FamilyMember, Room, Storage } from '@/lib/types'
+import { SearchBar } from './SearchBar'
 
 type Props = {
   familyId: string
   members: FamilyMember[]
+  decItems: DecItem[]
+  storages: Storage[]
+  rooms: Room[]
   onToast: (msg: string) => void
+  onSearchPick: (storageId: string) => void
 }
 
-export function Header({ familyId, members, onToast }: Props) {
+export function Header({ familyId, members, decItems, storages, rooms, onToast, onSearchPick }: Props) {
   const [fallbackLink, setFallbackLink] = useState<string | null>(null)
   const [inviting, setInviting] = useState(false)
 
@@ -40,17 +45,7 @@ export function Header({ familyId, members, onToast }: Props) {
           <h1>홈즈맵</h1>
           <span className="en">HOMES MAP</span>
         </div>
-        <div className="search-wrap">
-          <span className="icon">🔎</span>
-          <input
-            className="search-input"
-            type="text"
-            placeholder="어딨지? 물건 이름을 검색해보세요 (예: 손톱깎이)"
-            disabled
-            readOnly
-            aria-label="물건 검색"
-          />
-        </div>
+        <SearchBar decItems={decItems} storages={storages} rooms={rooms} onPick={onSearchPick} />
         <div className="members">
           <span className="label">사용 중:</span>
           {members.map((m) => (

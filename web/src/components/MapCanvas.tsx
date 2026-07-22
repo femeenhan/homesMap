@@ -20,6 +20,7 @@ type Props = {
   onStoragePlace: (room: Room, point: Pt, name: string) => void
   onRoomDelete: (room: Room) => void
   onToast: (msg: string) => void
+  flashStorageId?: string | null
 }
 
 type PendingModal =
@@ -38,6 +39,7 @@ export function MapCanvas({
   onStoragePlace,
   onRoomDelete,
   onToast,
+  flashStorageId,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<HTMLDivElement>(null)
@@ -55,6 +57,14 @@ export function MapCanvas({
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
+
+  // 검색 결과 클릭(flashStorageId 변경) 시 해당 수납장으로 스크롤(프로토타입 flashStorage 이식).
+  // glow/found 클래스는 아래 렌더에서 props로 결정되므로, 여기서는 스크롤이라는 부수효과만 담당한다.
+  useEffect(() => {
+    if (!flashStorageId) return
+    const el = mapRef.current?.querySelector<HTMLElement>('.storage.found')
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+  }, [flashStorageId])
 
   // 지도는 transform:scale() 로 시각적으로만 축소되므로, 화면 좌표를 940x600 논리 좌표로 되돌리려면
   // 클릭 지점과 지도 원점의 차를 scale로 나눠야 한다(프로토타입은 scale이 항상 1이라 나눗셈이 없었음).
@@ -111,6 +121,7 @@ export function MapCanvas({
     itemCountByStorage.set(item.storage_id, (itemCountByStorage.get(item.storage_id) ?? 0) + 1)
   }
 
+  const flashRoomId = flashStorageId ? storages.find((s) => s.id === flashStorageId)?.room_id : undefined
   const palMeta = STORAGE_TYPES.find((s) => s.type === palType)!
   const mapClassName = [
     'map',
@@ -133,13 +144,19 @@ export function MapCanvas({
             onClick={handleClick}
           >
             {rooms.map((room) => (
-              <RoomShape key={room.id} room={room} onDelete={(r) => setPendingModal({ kind: 'delete', room: r })} />
+              <RoomShape
+                key={room.id}
+                room={room}
+                glow={room.id === flashRoomId}
+                onDelete={(r) => setPendingModal({ kind: 'delete', room: r })}
+              />
             ))}
             {storages.map((storage) => (
               <StorageBadge
                 key={storage.id}
                 storage={storage}
                 itemCount={itemCountByStorage.get(storage.id) ?? 0}
+                found={storage.id === flashStorageId}
                 onClick={mode === 'select' ? onStorageClick : undefined}
               />
             ))}

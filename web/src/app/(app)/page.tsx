@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { keys } from '@/lib/keys'
 import { store } from '@/lib/store'
@@ -22,6 +22,7 @@ type BootData = {
   storages: Storage[]
   decItems: DecItem[]
   members: FamilyMember[]
+  activity: Activity[]
   offline: boolean
   skippedCount: number
 }
@@ -33,7 +34,18 @@ export default function AppHomePage() {
   const [mode, setMode] = useState<Mode>('select')
   const [palType, setPalType] = useState<StorageTypeKey>('drawer')
   const [selectedStorageId, setSelectedStorageId] = useState<string | null>(null)
+  const [flashStorageId, setFlashStorageId] = useState<string | null>(null)
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { message: toastMsg, showToast } = useToast()
+
+  // 검색 결과 클릭: 둘러보기 모드로 전환 + 패널 열기 + 지도에 4초간 flash(프로토타입 flashStorage 이식)
+  function handleSearchPick(storageId: string) {
+    setMode('select')
+    setSelectedStorageId(storageId)
+    setFlashStorageId(storageId)
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current)
+    flashTimerRef.current = setTimeout(() => setFlashStorageId(null), 4000)
+  }
 
   useEffect(() => {
     (async () => {
@@ -101,11 +113,12 @@ export default function AppHomePage() {
   async function loadLocalData(familyId: string, userId: string, offline: boolean) {
     const fdk = keys.getFDK()
     if (!fdk) return
-    const [rooms, storages, items, members] = await Promise.all([
+    const [rooms, storages, items, members, activity] = await Promise.all([
       store.allActive<Room>('rooms'),
       store.allActive<Storage>('storages'),
       store.allActive<Item>('items'),
       store.getAll<FamilyMember>('members'),
+      store.getAll<Activity>('activity'),
     ])
     // 손상된 블롭/키 불일치 등으로 한 물건의 복호화가 실패해도 나머지 지도는 정상 렌더 — 실패한 항목만 건너뜀
     const decrypted = await Promise.all(
@@ -124,7 +137,7 @@ export default function AppHomePage() {
     )
     const decItems = decrypted.filter((d): d is DecItem => d !== null)
     const skippedCount = decrypted.length - decItems.length
-    setData({ familyId, userId, rooms, storages, decItems, members, offline, skippedCount })
+    setData({ familyId, userId, rooms, storages, decItems, members, activity, offline, skippedCount })
   }
 
   // 앱으로 포커스가 돌아올 때 백그라운드로 재동기화(로컬 우선 — 실패해도 화면은 그대로 유지)
@@ -207,6 +220,7 @@ export default function AppHomePage() {
       }
       // 로컬 에코 먼저(다음 pull 전에도 활동 피드가 즉시 보이도록) — dirty 큐엔 안 올림(activity는 애초에 push 대상이 아님)
       await store.putLocal('activity', row, { dirty: false })
+      setData((d) => d && { ...d, activity: [row, ...d.activity] })
       // 서버에도 같은 id/created_at으로 insert — 나중에 pull()의 bulkPut이 같은 id를 덮어써 중복 없음
       await createClient().from('activity').insert(row)
     } catch {
@@ -402,13 +416,28 @@ export default function AppHomePage() {
 
   return (
     <>
-      <Header familyId={data.familyId} members={data.members} onToast={showToast} />
+      <Header
+        familyId={data.familyId}
+        members={data.members}
+        decItems={data.decItems}
+        storages={data.storages}
+        rooms={data.rooms}
+        onToast={showToast}
+        onSearchPick={handleSearchPick}
+      />
       {data.offline && <div className="offline-notice">오프라인 — 저장된 데이터로 표시 중</div>}
       {data.skippedCount > 0 && (
         <div className="offline-notice">일부 물건({data.skippedCount}개)을 해독하지 못해 표시하지 않았어요.</div>
       )}
       <div className="main">
-        <Toolbar mode={mode} onModeChange={setMode} palType={palType} onPalTypeChange={setPalType} />
+        <Toolbar
+          mode={mode}
+          onModeChange={setMode}
+          palType={palType}
+          onPalTypeChange={setPalType}
+          activity={data.activity}
+          members={data.members}
+        />
         <MapCanvas
           mode={mode}
           palType={palType}
@@ -420,6 +449,7 @@ export default function AppHomePage() {
           onStoragePlace={handleStoragePlace}
           onRoomDelete={handleRoomDelete}
           onToast={showToast}
+          flashStorageId={flashStorageId}
         />
         {selectedStorage && (
           <DetailPanel

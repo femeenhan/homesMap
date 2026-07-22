@@ -1,6 +1,9 @@
 import { createClient } from '@/lib/supabase/client'
 import { mergeRows } from './merge'
 import { store } from './store'
+import type { Room, Storage, Item } from './types'
+
+type SyncRow = Room | Storage | Item
 
 /** 전량 pull: 가족 데이터가 수백 행 수준이라 증분 워터마크 대신 전체를 받아 LWW 병합.
  *  ponytail: 증분(updated_at > lastSync)은 클라이언트 시계 스큐로 다른 기기의 push를 영영 못 받는
@@ -10,8 +13,8 @@ export async function pull(familyId: string) {
   for (const t of ['rooms', 'storages', 'items'] as const) {
     const { data, error } = await supabase.from(t).select('*').eq('family_id', familyId)
     if (error) throw error
-    const local = await store.getAll(t)
-    await store.bulkPut(t, mergeRows(local as any, (data ?? []) as any))
+    const local = await store.getAll<SyncRow>(t)
+    await store.bulkPut(t, mergeRows(local, (data ?? []) as SyncRow[]))
   }
   const { data: act, error: aErr } = await supabase.from('activity').select('*')
     .eq('family_id', familyId).order('created_at', { ascending: false }).limit(50)

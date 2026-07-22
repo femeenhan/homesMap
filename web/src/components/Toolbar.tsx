@@ -1,5 +1,6 @@
-import type { Mode, StorageTypeKey } from '@/lib/types'
+import type { Activity, FamilyMember, Mode, StorageTypeKey } from '@/lib/types'
 import { STORAGE_TYPES } from '@/lib/types'
+import { ActivityFeed } from './ActivityFeed'
 
 const HINTS: Record<Mode, string> = {
   select: '👆 수납장을 클릭하면 그 안의 물건을 보고 등록할 수 있어요. 위쪽 검색창에서 물건을 바로 찾아보세요.',
@@ -18,9 +19,11 @@ type Props = {
   onModeChange: (mode: Mode) => void
   palType: StorageTypeKey
   onPalTypeChange: (type: StorageTypeKey) => void
+  activity: Activity[]
+  members: FamilyMember[]
 }
 
-export function Toolbar({ mode, onModeChange, palType, onPalTypeChange }: Props) {
+export function Toolbar({ mode, onModeChange, palType, onPalTypeChange, activity, members }: Props) {
   return (
     <aside className="toolbar">
       <div>
@@ -51,6 +54,7 @@ export function Toolbar({ mode, onModeChange, palType, onPalTypeChange }: Props)
         </div>
       </div>
       <div className="hint">{HINTS[mode]}</div>
+      <ActivityFeed activity={activity} members={members} />
     </aside>
   )
 }
