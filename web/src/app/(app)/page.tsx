@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { keys, fetchPrimaryFamilyId } from '@/lib/keys'
 import { store } from '@/lib/store'
 import { syncNow, push, pull } from '@/lib/sync'
-import { decryptField, encryptField, encryptBytes } from '@/lib/crypto'
+import { decryptField, encryptField, encryptBytes, importFDKCode } from '@/lib/crypto'
+import { GUEST_MODE, GUEST_FAMILY_ID, GUEST_USER_ID, GUEST_FDK_CODE, guestSession } from '@/lib/guest'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/lib/useToast'
 import { Header } from '@/components/Header'
@@ -98,6 +99,8 @@ export default function AppHomePage() {
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
+          // 세션도 래핑키 캐시도 없는 방문자 — 게스트 모드면 로컬 샌드박스로, 아니면 로그인으로
+          if (GUEST_MODE) { await enterGuest(); return }
           router.replace('/login')
           return
         }
@@ -109,6 +112,15 @@ export default function AppHomePage() {
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router])
+
+  // 게스트(테스트) 진입: 고정 FDK 설정 + 로컬 신원으로 렌더. 서버 동기화·실데이터 접근 없음(로컬 샌드박스).
+  async function enterGuest() {
+    keys.setFDK(await importFDKCode(GUEST_FDK_CODE))
+    guestSession.activate()
+    await store.setMeta('familyId', GUEST_FAMILY_ID)
+    await store.setMeta('userId', GUEST_USER_ID)
+    await loadLocalData(GUEST_FAMILY_ID, GUEST_USER_ID, false)
+  }
 
   // META-FIRST: 로컬 메타에 캐시된 familyId가 있으면 네트워크 없이 즉시 로컬 스토어로 렌더(오프라인 경로).
   // 캐시가 없는 "이 기기 최초 부팅"일 때만 온라인 멤버십 조회가 필요.
@@ -659,6 +671,9 @@ export default function AppHomePage() {
       {data.offline && <div className="offline-notice">오프라인 — 저장된 데이터로 표시 중</div>}
       {data.skippedCount > 0 && (
         <div className="offline-notice">일부 물건({data.skippedCount}개)을 해독하지 못해 표시하지 않았어요.</div>
+      )}
+      {GUEST_MODE && data.userId === GUEST_USER_ID && (
+        <div className="offline-notice">🧪 테스트(게스트) 모드 · 로그인 없이 사용 중 — 데이터는 이 기기에만 저장돼요</div>
       )}
       <div className="viewtabs">
         <button type="button" className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>📋 목록</button>

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/client'
 import { mergeRows } from './merge'
 import { store } from './store'
+import { guestSession } from './guest'
 import type { Room, Storage, Item } from './types'
 
 type SyncRow = Room | Storage | Item
@@ -9,6 +10,7 @@ type SyncRow = Room | Storage | Item
  *  ponytail: 증분(updated_at > lastSync)은 클라이언트 시계 스큐로 다른 기기의 push를 영영 못 받는
  *  누락 위험이 있어 채택 안 함. 수천 행 넘으면 서버 스탬프 트리거 + 증분으로 승격 */
 export async function pull(familyId: string) {
+  if (guestSession.isActive()) return // 게스트: 로컬 전용, 서버 미접근
   const supabase = createClient()
   for (const t of ['rooms', 'storages', 'items'] as const) {
     const { data, error } = await supabase.from(t).select('*').eq('family_id', familyId)
@@ -28,6 +30,7 @@ export async function pull(familyId: string) {
 
 /** 로컬 dirty 행을 서버로 upsert */
 export async function push() {
+  if (guestSession.isActive()) return // 게스트: 로컬 전용, 서버 미접근
   const supabase = createClient()
   for (const t of ['rooms', 'storages', 'items'] as const) {
     const dirty = await store.dirtyRows(t)
