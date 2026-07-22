@@ -291,6 +291,19 @@ language sql security definer set search_path = public as $$
   where i.token = p_token and i.expires_at > now();
 $$;
 
+-- 초대 토큰 검증 후 멤버 추가. 비멤버는 fm_insert 정책에 막히므로 참여는 이 RPC로만 가능
+create or replace function join_family(p_token text, p_display_name text, p_wrapped_key text)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_family uuid;
+begin
+  select family_id into v_family from family_invites where token = p_token and expires_at > now();
+  if v_family is null then raise exception 'invalid or expired invite'; end if;
+  insert into family_members(family_id, user_id, display_name, wrapped_family_key)
+    values (v_family, auth.uid(), p_display_name, p_wrapped_key)
+    on conflict (family_id, user_id) do update set wrapped_family_key = excluded.wrapped_family_key;
+  return v_family;
+end; $$;
+
 alter table families        enable row level security;
 alter table family_members  enable row level security;
 alter table family_invites  enable row level security;
@@ -299,12 +312,17 @@ alter table storages        enable row level security;
 alter table items           enable row level security;
 alter table activity        enable row level security;
 
-create policy fam_select on families for select using (is_family_member(id));
+-- 생성 직후 insert().select() 반환 시점엔 아직 멤버 행이 없어 생성자 예외 필요
+create policy fam_select on families for select using (is_family_member(id) or created_by = auth.uid());
 create policy fam_insert on families for insert with check (created_by = auth.uid());
 create policy fam_update on families for update using (is_family_member(id));
 
 create policy fm_select on family_members for select using (is_family_member(family_id));
-create policy fm_insert on family_members for insert with check (user_id = auth.uid());
+-- 직접 insert는 '내가 만든 가족에 내 행'(생성자 owner 행)만. 초대 참여는 join_family RPC(definer) 경유 —
+-- user_id 체크만 두면 인증 유저가 임의 가족에 self-join 가능해지는 보안 홀
+create policy fm_insert on family_members for insert with check (
+  user_id = auth.uid() and exists (select 1 from families f where f.id = family_id and f.created_by = auth.uid())
+);
 create policy fm_update on family_members for update using (user_id = auth.uid());
 create policy fm_delete on family_members for delete using (user_id = auth.uid());
 
@@ -316,7 +334,12 @@ create policy storages_all on storages for all using (is_family_member(family_id
 create policy items_all    on items    for all using (is_family_member(family_id)) with check (is_family_member(family_id));
 create policy activity_all on activity for all using (is_family_member(family_id)) with check (is_family_member(family_id));
 ```
-Supabase SQL Editor에서 실행. 이후 **Storage 비공개 버킷 `item-photos` 생성** + Storage 정책(경로 첫 세그먼트 = 내 가족 id일 때만 read/write).
+Supabase SQL Editor에서 실행. 이후 **Storage 비공개 버킷 `item-photos` 생성** + 정책(경로 첫 세그먼트 = 내 가족 id):
+```sql
+create policy photos_rw on storage.objects for all
+  using (bucket_id = 'item-photos' and is_family_member(((storage.foldername(name))[1])::uuid))
+  with check (bucket_id = 'item-photos' and is_family_member(((storage.foldername(name))[1])::uuid));
+```
 
 - [ ] **Step 2: RLS 격리 확인** — 두 유저·두 가족으로 서로의 `items` select 시 0행.
 
@@ -522,21 +545,22 @@ Run → FAIL.
 - [ ] **Step 2: 병합 구현** — Create `web/src/lib/merge.ts`:
 ```ts
 export type Syncable = { id: string; updated_at: string }
-/** id별로 updated_at이 큰 쪽을 채택(LWW). ponytail: 클라이언트 시계 기준, 시계 스큐는 알려진 한계 */
+/** id별로 updated_at이 큰 쪽을 채택(LWW). ponytail: 클라이언트 시계 스탬프 기준, 스큐로 구식 쓰기가 이길 수 있음은 알려진 한계 */
 export function mergeRows<T extends Syncable>(local: T[], incoming: T[]): T[] {
   const byId = new Map(local.map(r => [r.id, r]))
   for (const inc of incoming) {
     const cur = byId.get(inc.id)
-    if (!cur || inc.updated_at >= cur.updated_at) byId.set(inc.id, inc)
+    // 서버('+00:00')와 클라('Z')의 ISO 표기가 달라 문자열 비교는 불가 → 파싱 비교
+    if (!cur || Date.parse(inc.updated_at) >= Date.parse(cur.updated_at)) byId.set(inc.id, inc)
   }
   return [...byId.values()]
 }
 ```
 Run → PASS.
 
-- [ ] **Step 3: IndexedDB 래퍼** — Create `web/src/lib/idb.ts`: `openDB(name)` → object stores `rooms/storages/items/activity`(keyPath `id`) + `meta`(key-value: lastSync 등) + `dirty`(변경 대기 id 집합). `get/getAll/put/bulkPut/delete/setMeta/getMeta` 프로미스 래퍼(약 60줄). (새 의존성 없이 raw IndexedDB)
+- [ ] **Step 3: IndexedDB 래퍼** — Create `web/src/lib/idb.ts`: `openDB(name)` → object stores `rooms/storages/items/activity/members`(keyPath `id`) + `meta`(key-value: wrappedKey 등) + `dirty`(변경 대기 id 집합). `get/getAll/put/bulkPut/delete/setMeta/getMeta` 프로미스 래퍼(약 60줄). (새 의존성 없이 raw IndexedDB)
 
-- [ ] **Step 4: 스토어** — Create `web/src/lib/store.ts`: `idb` 위에 도메인 API. `allActive(table)`=`deleted_at==null`만, `putLocal(table, row, {dirty})`, `dirtyRows(table)`, `clearDirty(ids)`, `getMeta/setMeta('lastSync')`. 렌더/편집은 이 API만 사용.
+- [ ] **Step 4: 스토어** — Create `web/src/lib/store.ts`: `idb` 위에 도메인 API. `allActive(table)`=`deleted_at==null`만, `putLocal(table, row, {dirty})`, `dirtyRows(table)`, `clearDirty(ids)`, `getMeta/setMeta`(wrappedKey 등). 렌더/편집은 이 API만 사용.
 
 - [ ] **Step 5: 커밋**
 ```bash
@@ -558,27 +582,25 @@ import { createClient } from '@/lib/supabase/client'
 import { mergeRows } from './merge'
 import { store } from './store'
 
-const TABLES = ['rooms', 'storages', 'items', 'activity'] as const
-
-/** 서버에서 lastSync 이후 변경분(삭제 포함)을 받아 로컬 병합 */
+/** 전량 pull: 가족 데이터가 수백 행 수준이라 증분 워터마크 대신 전체를 받아 LWW 병합.
+ *  ponytail: 증분(updated_at > lastSync)은 클라이언트 시계 스큐로 다른 기기의 push를 영영 못 받는
+ *  누락 위험이 있어 채택 안 함. 수천 행 넘으면 서버 스탬프 트리거 + 증분으로 승격 */
 export async function pull(familyId: string) {
   const supabase = createClient()
-  const since = (await store.getMeta('lastSync')) ?? '1970-01-01'
-  let newest = since
-  for (const t of TABLES) {
-    const col = t === 'activity' ? 'created_at' : 'updated_at'
-    const { data, error } = await supabase.from(t).select('*')
-      .eq('family_id', familyId).gt(col, since)
+  for (const t of ['rooms', 'storages', 'items'] as const) {
+    const { data, error } = await supabase.from(t).select('*').eq('family_id', familyId)
     if (error) throw error
-    if (data?.length) {
-      const local = await store.getAll(t)
-      // activity는 append-only라 그대로 add, 나머지는 LWW 병합
-      const merged = t === 'activity' ? [...local, ...data] : mergeRows(local as any, data as any)
-      await store.bulkPut(t, merged)
-      for (const r of data) if (r[col] > newest) newest = r[col]
-    }
+    const local = await store.getAll(t)
+    await store.bulkPut(t, mergeRows(local as any, (data ?? []) as any))
   }
-  await store.setMeta('lastSync', newest)
+  const { data: act, error: aErr } = await supabase.from('activity').select('*')
+    .eq('family_id', familyId).order('created_at', { ascending: false }).limit(50)
+  if (aErr) throw aErr
+  await store.bulkPut('activity', act ?? [])
+  // 멤버 목록도 캐시 → 오프라인에서 헤더·활동피드에 이름 표시 가능
+  const { data: members, error: mErr } = await supabase.from('family_members').select('*').eq('family_id', familyId)
+  if (mErr) throw mErr
+  await store.bulkPut('members', members ?? [])
 }
 
 /** 로컬 dirty 행을 서버로 upsert */
@@ -633,6 +655,7 @@ git commit -m "feat: login (magic link + kakao/google) and auth callback"
 - [ ] **Step 1: 세션 키 홀더 + 온보딩 로직** — Create `web/src/lib/keys.ts`:
 ```ts
 import { createClient } from '@/lib/supabase/client'
+import { store } from './store'
 import { generateFDK, wrapFDK, unwrapFDK, importFDKCode, exportFDKCode } from './crypto'
 
 let sessionFDK: CryptoKey | null = null           // 메모리에만. 새로고침 시 unlock 필요
@@ -654,48 +677,71 @@ export async function createFamilyWithKey(familyName: string, displayName: strin
   const { error: mErr } = await supabase.from('family_members')
     .insert({ family_id: fam.id, user_id: user.id, display_name: displayName, role: 'owner', wrapped_family_key: wrapped })
   if (mErr) throw mErr
+  await store.setMeta('wrappedKey', wrapped)      // 오프라인 잠금해제용 로컬 캐시(래핑=암호화 상태라 안전)
   keys.setFDK(fdk)
   return { familyId: fam.id, recoveryCode: await exportFDKCode(fdk) }
 }
 
-/** 초대 참여: 프래그먼트의 FDK코드로 복원 → 내 패스프레이즈로 래핑해 내 멤버 행 삽입 */
+/** 초대 참여: 프래그먼트의 FDK코드 복원 → 내 패스프레이즈로 래핑 → 토큰 검증 RPC로 멤버 등록 */
 export async function joinFamilyWithKey(token: string, fdkCode: string, displayName: string, passphrase: string): Promise<string> {
   const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('unauthenticated')
-  const { data: inv, error: iErr } = await supabase.rpc('get_invite_family', { p_token: token })
-  if (iErr) throw iErr
-  const familyId: string | undefined = inv?.[0]?.family_id
-  if (!familyId) throw new Error('유효하지 않거나 만료된 초대')
   const fdk = await importFDKCode(fdkCode)
   const wrapped = await wrapFDK(fdk, passphrase)
-  const { error } = await supabase.from('family_members')
-    .insert({ family_id: familyId, user_id: user.id, display_name: displayName, wrapped_family_key: wrapped })
-  if (error) throw error
+  const { data: familyId, error } = await supabase.rpc('join_family', { p_token: token, p_display_name: displayName, p_wrapped_key: wrapped })
+  if (error || !familyId) throw error ?? new Error('유효하지 않거나 만료된 초대')
+  await store.setMeta('wrappedKey', wrapped)
   keys.setFDK(fdk)
-  return familyId
+  return familyId as string
 }
 
-/** 기존 기기/재로그인: 내 wrapped_family_key를 패스프레이즈로 풀어 세션 FDK 복원 */
+/** 잠금해제: 로컬 캐시 우선(오프라인 가능) → 없으면 서버에서 래핑 키 조회 후 캐시 */
 export async function unlockWithPassphrase(passphrase: string): Promise<void> {
+  let wrapped: string | null = (await store.getMeta('wrappedKey')) ?? null
+  if (!wrapped) {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('unauthenticated')
+    const { data } = await supabase.from('family_members').select('wrapped_family_key').eq('user_id', user.id).limit(1).maybeSingle()
+    wrapped = data?.wrapped_family_key ?? null
+    if (wrapped) await store.setMeta('wrappedKey', wrapped)
+  }
+  if (!wrapped) throw new Error('래핑 키 없음')
+  keys.setFDK(await unwrapFDK(wrapped, passphrase))  // 틀리면 throw
+}
+
+/** 복구코드(원본 FDK)로 복원 + 새 패스프레이즈로 재래핑 저장 */
+export async function unlockWithRecoveryCode(code: string, newPassphrase: string): Promise<void> {
+  const fdk = await importFDKCode(code.trim())
+  const wrapped = await wrapFDK(fdk, newPassphrase)
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('unauthenticated')
-  const { data } = await supabase.from('family_members').select('wrapped_family_key').eq('user_id', user.id).limit(1).maybeSingle()
-  if (!data?.wrapped_family_key) throw new Error('래핑 키 없음')
-  keys.setFDK(await unwrapFDK(data.wrapped_family_key, passphrase)) // 틀리면 throw
+  if (user) await supabase.from('family_members').update({ wrapped_family_key: wrapped }).eq('user_id', user.id)
+  await store.setMeta('wrappedKey', wrapped)
+  keys.setFDK(fdk)
+}
+
+/** 초대 링크 생성: token 발급 + FDK를 URL 프래그먼트로(서버 미전송) */
+export async function createInviteLink(familyId: string): Promise<string> {
+  const fdk = keys.getFDK()
+  if (!fdk) throw new Error('locked')
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data, error } = await supabase.from('family_invites')
+    .insert({ family_id: familyId, created_by: user!.id }).select('token').single()
+  if (error || !data) throw error ?? new Error('초대 생성 실패')
+  return `${location.origin}/invite/${data.token}#k=${await exportFDKCode(fdk)}`
 }
 ```
 
 - [ ] **Step 2: 온보딩 페이지** — Create `web/src/app/onboarding/page.tsx`(클라이언트): 가족명·내이름·패스프레이즈 입력 → `createFamilyWithKey` → **복구코드 1회 표시 모달**("이 코드를 안전한 곳에 보관하세요. 전원이 암호를 잊으면 이 코드로만 복구됩니다.") → 확인 후 `/`.
 
-- [ ] **Step 3: 초대 수락 페이지** — Create `web/src/app/invite/[token]/page.tsx`(클라이언트): `location.hash`에서 `#k=` 추출(서버 미전송). 미로그인 시 `/login`으로 보내되 원래 URL(프래그먼트 포함) 복귀. 로그인 상태면 내이름·패스프레이즈 입력 → `joinFamilyWithKey(token, fdkCode, ...)` → `/`.
+- [ ] **Step 3: 초대 수락 페이지** — Create `web/src/app/invite/[token]/page.tsx`(클라이언트): `location.hash`에서 `#k=` 추출(서버 미전송). **프래그먼트는 로그인 리다이렉트를 살아남지 못하므로 진입 즉시 token+key를 sessionStorage에 스테이징**, 미로그인 시 `/login` → 복귀 후 복원. 로그인 상태면 내이름·패스프레이즈 입력 → `joinFamilyWithKey(token, fdkCode, ...)` → `/`.
 
-- [ ] **Step 4: 잠금해제 페이지** — Create `web/src/app/unlock/page.tsx`: 패스프레이즈 입력 → `unlockWithPassphrase` → `/`. 실패 시 "암호가 올바르지 않아요" + "다른 가족원에게 초대 링크를 받아 재참여" 안내.
+- [ ] **Step 4: 잠금해제 페이지** — Create `web/src/app/unlock/page.tsx`: 패스프레이즈 입력 → `unlockWithPassphrase` → `/`. 실패 시 "암호가 올바르지 않아요" + 대안 2가지 안내: ① **"복구코드로 열기"**(입력 → `unlockWithRecoveryCode`, 새 패스프레이즈 설정) ② 다른 가족원에게 초대 링크를 받아 재참여. 래핑 키가 로컬 캐시에 있으면 **오프라인에서도 잠금해제 가능**.
 
-- [ ] **Step 5: 보호 레이아웃** — Create `web/src/app/(app)/layout.tsx`(서버 컴포넌트): 미로그인 → `/login`. (FDK 유무는 메모리라 서버에서 모름 → **클라이언트 가드**로: `(app)/page.tsx` 최상단에서 `keys.hasFDK()` false면 멤버십 있으면 `/unlock`, 없으면 `/onboarding`으로 라우팅.)
+- [ ] **Step 5: 보호 레이아웃** — Create `web/src/app/(app)/layout.tsx`(서버 컴포넌트): 미로그인 → `/login`. (FDK 유무는 메모리라 서버에서 모름 → **클라이언트 가드**로: `(app)/page.tsx` 최상단에서 `keys.hasFDK()` false면 — 로컬 캐시된 wrappedKey 있으면 `/unlock`(오프라인 가능), 없으면 온라인 멤버십 조회로 `/unlock`·`/onboarding` 분기.)
 
-- [ ] **Step 6: 브라우저 검증** — 신규: 로그인→온보딩→복구코드 표시→앱. 재로그인/새로고침: `/unlock`에서 암호 입력→앱. 둘째 계정: 첫 계정이 만든 초대 링크(`/invite/<t>#k=...`)로 참여→같은 가족. 새 기기에서 틀린 암호→거부.
+- [ ] **Step 6: 브라우저 검증** — 신규: 로그인→온보딩→복구코드 표시→앱. 재로그인/새로고침: `/unlock`에서 암호 입력→앱. 둘째 계정: 초대 링크(`/invite/<t>#k=...`, `createInviteLink`로 생성 — 버튼은 Task 9 Header, 이 단계에선 콘솔 호출로 확인 가능)로 참여→같은 가족. 새 기기에서 틀린 암호→거부, 복구코드 입력→복원.
 - [ ] **Step 7: 커밋**
 ```bash
 git add web/src/lib/keys.ts web/src/app/onboarding web/src/app/unlock web/src/app/invite "web/src/app/(app)/layout.tsx"
@@ -714,11 +760,11 @@ git commit -m "feat: family onboarding, key setup/unlock, invite-fragment key sh
 - [ ] **Step 2: 앱 부트(클라이언트 컴포넌트)** — `(app)/page.tsx`:
   1) `keys.hasFDK()` 확인(없으면 unlock/onboarding 라우팅, Task 8),
   2) 최초 진입 시 `syncNow(familyId)`로 서버→IndexedDB 하이드레이트,
-  3) `store.allActive('rooms'|'storages'|'items')` 로드,
+  3) `store.allActive('rooms'|'storages'|'items')` + `members` 로드(헤더·활동피드 이름 표시용),
   4) items는 `decryptField(fdk, enc_name/enc_memo)`로 복호화해 `DecItem[]` 생성(메모리),
   5) `MapCanvas`에 전달. 진입 후 포커스 시 백그라운드 `syncNow` 재실행.
 - [ ] **Step 3: MapCanvas 반응형 렌더** — `LOGICAL_W/H` `#map`을 `fitScale`로 `transform: scale()`. `ResizeObserver`로 컨테이너 추적. rooms→`RoomShape`, storages→`StorageBadge`(물건 수 배지 = 해당 storage의 DecItem 수). 클릭은 이 태스크에선 no-op.
-- [ ] **Step 4: RoomShape / StorageBadge / Header** — 프로토타입 `renderMap` DOM 구조 이식. Header: 로고 + 검색창 자리 + 멤버 표시.
+- [ ] **Step 4: RoomShape / StorageBadge / Header** — 프로토타입 `renderMap` DOM 구조 이식. Header: 로고 + 검색창 자리 + 멤버 표시 + **"가족 초대" 버튼**(`createInviteLink` → 클립보드 복사·토스트 — 초대 생성 UI는 여기 하나).
 - [ ] **Step 5: 브라우저 검증** — Task 10으로 데이터 생성 후 or 수동 삽입 → 방·수납장 표시, 창 축소 시 비율 유지. 물건 이름이 서버(DB)엔 암호블롭인데 화면엔 평문으로 복호화되어 보임.
 - [ ] **Step 6: 커밋**
 ```bash
@@ -833,5 +879,5 @@ git commit -m "feat: local search with map flash + decrypted activity feed"
 
 - **Spec 커버리지**: 로컬-퍼스트(T5·T6·T9) · E2E 암호화/키관리(T4·T8·T11) · PWA(T1) · 인증(T7) · 가족/초대 프래그먼트 키(T8) · 복구코드(T8) · 지도에디터(T9·T10) · 암호화 물건/사진(T11) · 검색(T12) · 활동피드 복호화(T12) · 반응형(T9). 설계 rev2 v1 항목 전부 태스크 존재. §13 기본값(복구코드/암호경계 물건만/PBKDF2/링크초대/자체SW) 반영.
 - **Placeholder 스캔**: "적절히 처리" 류 없음. 보안·동기화 핵심은 완전 코드+테스트, UI는 프로토타입 이식 근거 명시.
-- **타입 일관성**: `Item`(암호블롭 저장형) vs `DecItem`(복호화 렌더형) 구분 일관. `mergeRows`는 `Syncable`(id,updated_at) 제약, activity는 append(병합 제외)로 처리. `encryptField/decryptField`·`wrapFDK/unwrapFDK`·`searchItems(DecItem[])`·`buildActivityMessage` 시그니처가 테스트·소비처와 일치. `store`/`sync`/`keys` API 이름이 태스크 간 동일.
-```
+- **타입 일관성**: `Item`(암호블롭 저장형) vs `DecItem`(복호화 렌더형) 구분 일관. `mergeRows`는 `Syncable`(id,updated_at) 제약, activity는 최근 50건 교체로 처리. `encryptField/decryptField`·`wrapFDK/unwrapFDK`·`searchItems(DecItem[])`·`buildActivityMessage` 시그니처가 테스트·소비처와 일치. `store`/`sync`/`keys` API 이름이 태스크 간 동일.
+- **실행 전 점검 반영(rev2.1)**: ① 생성자 select 예외(RLS 함정) ② 참여를 `join_family` RPC로 전환해 임의 self-join 차단 ③ 증분→전량 pull(시계 스큐 누락 제거) ④ wrappedKey 로컬 캐시로 오프라인 잠금해제 ⑤ 복구코드 입력 경로 ⑥ 초대 링크 생성 UI ⑦ 타임스탬프 파싱 비교 ⑧ 프래그먼트 sessionStorage 스테이징 ⑨ Storage 정책 SQL 명시.
