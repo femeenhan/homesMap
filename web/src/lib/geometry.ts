@@ -2,11 +2,13 @@ export const LOGICAL_W = 940
 export const LOGICAL_H = 600
 export const MIN_ROOM_W = 60 // 방 생성/리사이즈 최소 크기(생성 드래그 임계값과 동일)
 export const MIN_ROOM_H = 50
+export const MAX_SCALE = 1.8 // 큰 화면에서 맵이 여백까지 채우되 초대형 모니터 과확대는 막는 상한
 export type Pt = { x: number; y: number }
 export type Rect = { x: number; y: number; w: number; h: number }
 
+// 컨테이너(cw×ch)에 940×600 논리 캔버스를 균일 비율로 맞추는 배율. MAX_SCALE까지는 확대해 남는 공간을 채운다.
 export function fitScale(cw: number, ch: number): number {
-  return Math.min(1, cw / LOGICAL_W, ch / LOGICAL_H)
+  return Math.min(MAX_SCALE, cw / LOGICAL_W, ch / LOGICAL_H)
 }
 export function normalizeRect(a: Pt, b: Pt): Rect {
   return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) }

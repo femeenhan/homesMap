@@ -5,9 +5,9 @@ import {
 } from './geometry'
 
 describe('geometry', () => {
-  it('fitScale: 비율 유지 축소, 최대 1', () => {
+  it('fitScale: 비율 유지, MAX_SCALE까지 확대', () => {
     expect(fitScale(470, 300)).toBeCloseTo(0.5)
-    expect(fitScale(2000, 2000)).toBe(1)
+    expect(fitScale(9400, 6000)).toBe(1.8) // 컨테이너가 충분히 크면 상한(MAX_SCALE)까지
   })
   it('normalizeRect: 좌상단+w/h 정규화', () => {
     expect(normalizeRect({ x: 100, y: 80 }, { x: 40, y: 200 })).toEqual({ x: 40, y: 80, w: 60, h: 120 })

@@ -81,7 +81,7 @@ header{
 }
 
 /* ---------- Layout ---------- */
-.main{flex:1;display:flex;min-height:0}
+.main{flex:1;display:flex;min-height:0;position:relative} /* position:relative — 상세 패널 오버레이 드로어의 기준 */
 
 /* ---------- Toolbar ---------- */
 .toolbar{
@@ -197,12 +197,17 @@ header{
   padding:10px 4px 0;font-size:12.5px;color:var(--ink-soft);
 }
 
-/* ---------- Detail panel ---------- */
+/* ---------- Detail panel (오버레이 드로어) ---------- */
+/* in-flow에서 빼내 맵 위 오른쪽에 겹침 — 열어도 맵 폭을 뺏지 않는다. 비모달(백드롭 없음)이라 맵은 계속 조작 가능. */
 .detail-panel{
-  width:300px;flex-shrink:0;background:var(--paper);border-left:1px solid var(--line);
+  position:absolute;top:0;right:0;bottom:0;z-index:40;
+  width:min(320px,90vw);background:var(--paper);border-left:1px solid var(--line);
+  box-shadow:-6px 0 18px rgba(72,58,40,.10);
   display:none;flex-direction:column;min-height:0;
 }
-.detail-panel.open{display:flex}
+.detail-panel.open{display:flex;animation:dp-slide-in .22s ease-out}
+@keyframes dp-slide-in{from{transform:translateX(100%)}to{transform:translateX(0)}}
+@media (prefers-reduced-motion:reduce){.detail-panel.open{animation:none}}
 .dp-head{padding:16px 16px 12px;border-bottom:1px solid var(--line);position:relative}
 .dp-close{position:absolute;top:12px;right:12px;font-size:15px;color:var(--ink-soft);width:26px;height:26px;border-radius:50%}
 .dp-close:hover{background:var(--bg)}
