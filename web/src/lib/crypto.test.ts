@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generateFDK, encryptField, decryptField, wrapFDK, unwrapFDK, exportFDKCode, importFDKCode } from './crypto'
+import { generateFDK, encryptField, decryptField, wrapFDK, unwrapFDK, exportFDKCode, importFDKCode, encryptBytes, decryptBytes } from './crypto'
 
 describe('crypto', () => {
   it('필드 암복호 왕복', async () => {
@@ -25,5 +25,13 @@ describe('crypto', () => {
     const code = await exportFDKCode(fdk)
     const imported = await importFDKCode(code)
     expect(await decryptField(imported, await encryptField(fdk, 'y'))).toBe('y')
+  })
+  it('사진 바이트(encryptBytes/decryptBytes) 왕복', async () => {
+    const fdk = await generateFDK()
+    const original = new Uint8Array([1, 2, 3, 250, 0, 128, 255, 42])
+    const blob = await encryptBytes(fdk, original.buffer)
+    const packed = await blob.arrayBuffer()
+    const plain = await decryptBytes(fdk, packed)
+    expect(new Uint8Array(plain)).toEqual(original)
   })
 })

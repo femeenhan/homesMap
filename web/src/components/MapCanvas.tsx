@@ -140,7 +140,7 @@ export function MapCanvas({
                 key={storage.id}
                 storage={storage}
                 itemCount={itemCountByStorage.get(storage.id) ?? 0}
-                onClick={onStorageClick}
+                onClick={mode === 'select' ? onStorageClick : undefined}
               />
             ))}
             {dragRect && (

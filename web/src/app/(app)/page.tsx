@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation'
 import { keys } from '@/lib/keys'
 import { store } from '@/lib/store'
 import { syncNow, push } from '@/lib/sync'
-import { decryptField, encryptField } from '@/lib/crypto'
+import { decryptField, encryptField, encryptBytes } from '@/lib/crypto'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/lib/useToast'
 import { Header } from '@/components/Header'
 import { Toolbar } from '@/components/Toolbar'
 import { MapCanvas } from '@/components/MapCanvas'
-import type { Room, Storage, Item, DecItem, FamilyMember, Mode, StorageTypeKey, Activity } from '@/lib/types'
+import { DetailPanel } from '@/components/DetailPanel'
+import type { Room, Storage, Item, DecItem, FamilyMember, Mode, StorageTypeKey, Activity, ItemDraft } from '@/lib/types'
 import type { Pt, Rect } from '@/lib/geometry'
 
 type BootData = {
@@ -31,6 +32,7 @@ export default function AppHomePage() {
   const [error, setError] = useState(false)
   const [mode, setMode] = useState<Mode>('select')
   const [palType, setPalType] = useState<StorageTypeKey>('drawer')
+  const [selectedStorageId, setSelectedStorageId] = useState<string | null>(null)
   const { message: toastMsg, showToast } = useToast()
 
   useEffect(() => {
@@ -186,19 +188,20 @@ export default function AppHomePage() {
       showToast('오프라인 — 나중에 동기화됩니다')
     }
     // 활동 기록은 최선노력(best-effort) — 실패(오프라인 등)해도 조용히 무시, UI를 막지 않음
-    void recordActivity(data.familyId, data.userId, room.name, name)
+    void recordActivity(data.familyId, data.userId, 'storage_added', { roomName: room.name, storageName: name })
   }
 
-  async function recordActivity(familyId: string, actorId: string, roomName: string, storageName: string) {
+  // kind/payload를 일반화 — Task 10의 storage_added와 Task 11의 item_added가 이 한 경로를 공유
+  async function recordActivity(familyId: string, actorId: string, kind: string, payload: Record<string, string>) {
     const fdk = keys.getFDK()
     if (!fdk) return
     try {
-      const enc_payload = await encryptField(fdk, JSON.stringify({ roomName, storageName }))
+      const enc_payload = await encryptField(fdk, JSON.stringify(payload))
       const row: Activity = {
         id: crypto.randomUUID(),
         family_id: familyId,
         actor_id: actorId,
-        kind: 'storage_added',
+        kind,
         enc_payload,
         created_at: new Date().toISOString(),
       }
@@ -244,6 +247,132 @@ export default function AppHomePage() {
     }
   }
 
+  // ---------- 상세 패널: 물건 등록/삭제 + 수납장 삭제(연쇄) ----------
+
+  // 사진 다운스케일/압축: 긴 변 최대 1280px로 canvas에 리드로우 후 JPEG 0.8 품질로 재인코딩.
+  // 별도 라이브러리 없이 네이티브 canvas만 사용 — 원본을 그대로 암호화하면 업로드 용량이 커짐.
+  async function downscaleImage(file: File): Promise<ArrayBuffer> {
+    const bitmap = await createImageBitmap(file)
+    const maxEdge = 1280
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height))
+    const w = Math.round(bitmap.width * scale)
+    const h = Math.round(bitmap.height * scale)
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    canvas.getContext('2d')!.drawImage(bitmap, 0, 0, w, h)
+    const blob = await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('사진 변환 실패'))), 'image/jpeg', 0.8)
+    )
+    return blob.arrayBuffer()
+  }
+
+  // draft 배열을 받는 이유: v1은 폼 1건이지만, 훗날 AI가 사진 한 장에서 여러 물건을 인식해
+  // 한 번에 넘기는 경로도 이 함수 하나로 처리되도록 하는 이음새(브리프 지시).
+  async function handleItemsAdd(storage: Storage, room: Room | undefined, drafts: ItemDraft[]) {
+    if (!data) return
+    const fdk = keys.getFDK()
+    if (!fdk) return
+    const supabase = createClient()
+    const now = new Date().toISOString()
+    const newItems: DecItem[] = []
+    let photoFailed = false
+
+    for (const draft of drafts) {
+      const itemId = crypto.randomUUID()
+      let photo_path: string | null = null
+      if (draft.photoFile) {
+        try {
+          const bytes = await downscaleImage(draft.photoFile)
+          const encBlob = await encryptBytes(fdk, bytes)
+          const path = `${data.familyId}/${itemId}/${crypto.randomUUID()}`
+          const { error: upErr } = await supabase.storage.from('item-photos').upload(path, encBlob)
+          if (upErr) throw upErr
+          photo_path = path
+        } catch {
+          // 사진 업로드는 네트워크가 필요 — 실패해도 물건 자체는 사진 없이 저장(브리프 지시)
+          photoFailed = true
+        }
+      }
+      const enc_name = await encryptField(fdk, draft.name)
+      const enc_memo = draft.memo ? await encryptField(fdk, draft.memo) : null
+      const row: Item = {
+        id: itemId,
+        family_id: data.familyId,
+        storage_id: storage.id,
+        enc_name,
+        enc_memo,
+        emoji: '📦',
+        photo_path,
+        created_by: data.userId,
+        created_at: now,
+        updated_at: now,
+        deleted_at: null,
+      }
+      await store.putLocal('items', row, { dirty: true })
+      newItems.push({ ...row, name: draft.name, memo: draft.memo })
+      void recordActivity(data.familyId, data.userId, 'item_added', {
+        roomName: room?.name ?? '', storageName: storage.name, itemName: draft.name,
+      })
+    }
+
+    setData((d) => d && { ...d, decItems: [...d.decItems, ...newItems] })
+
+    try {
+      await push()
+      if (photoFailed) showToast('사진 업로드 실패 — 물건은 저장했어요')
+    } catch {
+      showToast('오프라인 — 나중에 동기화됩니다')
+    }
+  }
+
+  async function handleItemDelete(item: DecItem) {
+    if (!data) return
+    const now = new Date().toISOString()
+    // 암호화된 원본 행을 로컬에서 읽어 deleted_at/updated_at만 갱신(복호화 없이 나머지 필드 보존)
+    const allItems = await store.allActive<Item>('items')
+    const stored = allItems.find((it) => it.id === item.id)
+    if (!stored) return
+    const updated: Item = { ...stored, deleted_at: now, updated_at: now }
+    await store.putLocal('items', updated, { dirty: true })
+
+    setData((d) => d && { ...d, decItems: d.decItems.filter((it) => it.id !== item.id) })
+
+    try {
+      await push()
+      showToast(`'${item.name}' 삭제됨`)
+    } catch {
+      showToast('오프라인 — 나중에 동기화됩니다')
+    }
+  }
+
+  async function handleStorageDelete(storage: Storage) {
+    if (!data) return
+    const now = new Date().toISOString()
+    const allItems = await store.allActive<Item>('items')
+    const items = allItems.filter((it) => it.storage_id === storage.id)
+
+    const updatedStorage: Storage = { ...storage, deleted_at: now, updated_at: now }
+    const updatedItems = items.map((it) => ({ ...it, deleted_at: now, updated_at: now }))
+
+    await store.putLocal('storages', updatedStorage, { dirty: true })
+    await Promise.all(updatedItems.map((it) => store.putLocal('items', it, { dirty: true })))
+
+    setSelectedStorageId(null)
+    setData((d) => d && {
+      ...d,
+      storages: d.storages.filter((s) => s.id !== storage.id),
+      decItems: d.decItems.filter((it) => it.storage_id !== storage.id),
+    })
+
+    try {
+      await push()
+      showToast(`'${storage.name}' 수납장을 삭제했어요`)
+    } catch {
+      showToast('오프라인 — 나중에 동기화됩니다')
+    }
+  }
+
   if (error) {
     return (
       <div
@@ -266,6 +395,10 @@ export default function AppHomePage() {
 
   if (!data) return null
 
+  const selectedStorage = data.storages.find((s) => s.id === selectedStorageId)
+  const selectedRoom = selectedStorage ? data.rooms.find((r) => r.id === selectedStorage.room_id) : undefined
+  const selectedItems = selectedStorage ? data.decItems.filter((it) => it.storage_id === selectedStorage.id) : []
+
   return (
     <>
       <Header familyId={data.familyId} members={data.members} onToast={showToast} />
@@ -281,11 +414,25 @@ export default function AppHomePage() {
           rooms={data.rooms}
           storages={data.storages}
           decItems={data.decItems}
+          onStorageClick={setSelectedStorageId}
           onRoomCreate={handleRoomCreate}
           onStoragePlace={handleStoragePlace}
           onRoomDelete={handleRoomDelete}
           onToast={showToast}
         />
+        {selectedStorage && (
+          <DetailPanel
+            key={selectedStorage.id}
+            storage={selectedStorage}
+            room={selectedRoom}
+            items={selectedItems}
+            members={data.members}
+            onClose={() => setSelectedStorageId(null)}
+            onItemsAdd={(drafts) => handleItemsAdd(selectedStorage, selectedRoom, drafts)}
+            onItemDelete={handleItemDelete}
+            onStorageDelete={handleStorageDelete}
+          />
+        )}
       </div>
       <div className={`toast${toastMsg ? ' show' : ''}`}>{toastMsg}</div>
     </>

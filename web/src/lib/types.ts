@@ -19,6 +19,9 @@ export type Item = {
   created_at: string; updated_at: string; deleted_at: string | null
 }
 export type DecItem = Omit<Item, 'enc_name' | 'enc_memo'> & { name: string; memo: string }
+// 물건 등록 폼 제출 단위. 배열로 다루는 이유: v1은 폼 1건이지만, 훗날 사진 한 장에서 여러 물건을
+// AI로 인식해 한 번에 확인·등록하는 기능이 이 자리(같은 제출 경로)에 그대로 꽂히도록 하기 위함.
+export type ItemDraft = { name: string; memo: string; photoFile?: File }
 export type Activity = { id: UUID; family_id: UUID; actor_id: UUID; kind: string; enc_payload: string; created_at: string }
 
 export type Mode = 'select' | 'room' | 'storage'
