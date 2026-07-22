@@ -5,7 +5,7 @@
 export type Table = 'rooms' | 'storages' | 'items' | 'activity' | 'members'
 type StoreName = Table | 'meta' | 'dirty'
 
-const TABLES: Table[] = ['rooms', 'storages', 'items', 'activity', 'members']
+export const TABLES: Table[] = ['rooms', 'storages', 'items', 'activity', 'members']
 const DB_NAME = 'homes-map'
 const DB_VERSION = 1
 
@@ -56,4 +56,7 @@ export async function bulkPut(name: Table, values: unknown[]): Promise<void> {
 }
 export async function del(name: StoreName, key: IDBValidKey): Promise<void> {
   await wrap((await getStore(name, 'readwrite')).delete(key))
+}
+export async function clear(name: StoreName): Promise<void> {
+  await wrap((await getStore(name, 'readwrite')).clear())
 }

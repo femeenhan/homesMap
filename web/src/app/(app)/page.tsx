@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { keys } from '@/lib/keys'
 import { store } from '@/lib/store'
-import { syncNow, push } from '@/lib/sync'
+import { syncNow, push, pull } from '@/lib/sync'
 import { decryptField, encryptField, encryptBytes } from '@/lib/crypto'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/lib/useToast'
@@ -25,6 +25,15 @@ type BootData = {
   activity: Activity[]
   offline: boolean
   skippedCount: number
+}
+
+type SupabaseClient = ReturnType<typeof createClient>
+
+// 여러 가족에 속한 사용자도 항상 같은(가장 먼저 가입한) 가족을 고르도록 정렬 — 순서 없으면 조회마다 달라질 수 있음
+async function fetchPrimaryFamilyId(supabase: SupabaseClient, userId: string): Promise<string | undefined> {
+  const { data } = await supabase.from('family_members').select('family_id').eq('user_id', userId)
+    .order('joined_at', { ascending: true }).limit(1)
+  return data?.[0]?.family_id
 }
 
 export default function AppHomePage() {
@@ -59,6 +68,7 @@ export default function AppHomePage() {
               router.replace(`/invite/${token}#k=${k}`)
               return
             }
+            sessionStorage.removeItem('pendingInvite') // token/k 없는 쓸모없는 항목 — 남겨두면 다음에도 계속 걸림
           } catch {
             sessionStorage.removeItem('pendingInvite')
           }
@@ -93,21 +103,69 @@ export default function AppHomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router])
 
+  // META-FIRST: 로컬 메타에 캐시된 familyId가 있으면 네트워크 없이 즉시 로컬 스토어로 렌더(오프라인 경로).
+  // 캐시가 없는 "이 기기 최초 부팅"일 때만 온라인 멤버십 조회가 필요.
   async function boot() {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.replace('/login'); return }
-    const { data: fm } = await supabase.from('family_members').select('family_id').eq('user_id', user.id).limit(1)
-    const familyId = fm?.[0]?.family_id
-    if (!familyId) { setError(true); return }
+    const cachedFamilyId = await store.getMeta<string>('familyId')
 
-    let offline = false
-    try {
-      await syncNow(familyId)
-    } catch {
-      offline = true // 서버 동기화 실패 — 로컬 스토어 데이터로 그대로 진행(로컬 우선 원칙)
+    if (cachedFamilyId) {
+      const cachedUserId = (await store.getMeta<string>('userId')) ?? ''
+      await loadLocalData(cachedFamilyId, cachedUserId, false)
+      await reconcileWithServer(cachedFamilyId)
+      return
     }
-    await loadLocalData(familyId, user.id, offline)
+
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.replace('/login'); return }
+      const familyId = await fetchPrimaryFamilyId(supabase, user.id)
+      if (!familyId) { setError(true); return }
+      await store.setMeta('familyId', familyId)
+      await store.setMeta('userId', user.id)
+
+      let offline = false
+      try {
+        await syncNow(familyId)
+      } catch {
+        offline = true // 서버 동기화 실패 — 로컬 스토어 데이터로 그대로 진행(로컬 우선 원칙)
+      }
+      await loadLocalData(familyId, user.id, offline)
+    } catch {
+      setError(true) // 로컬 캐시가 전혀 없는 최초 부팅에서만 사용 — 오프라인 경로(위 분기)는 이 에러 화면을 타지 않음
+    }
+  }
+
+  // 캐시된 로컬 데이터로 이미 렌더한 뒤 백그라운드에서 서버와 대조.
+  // - 네트워크 실패(오프라인) → 화면은 그대로, 오프라인 배지만 표시
+  // - 인증된 사용자의 실제(첫 가입) 가족이 캐시와 다름(계정 전환) → 이전 가족의 평문 캐시를 지우고 전환 후 새로 받음
+  // - 일치 → 평소처럼 동기화하고 다시 로드
+  async function reconcileWithServer(cachedFamilyId: string) {
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('오프라인 또는 미인증')
+      const authoritativeFamilyId = await fetchPrimaryFamilyId(supabase, user.id)
+      if (!authoritativeFamilyId) throw new Error('가족 멤버십 없음')
+
+      if (authoritativeFamilyId !== cachedFamilyId) {
+        // 계정 전환: 로컬 스토어가 다른 가족의 평문 데이터를 들고 있으므로 지우고 새 가족으로 전환
+        // ponytail: 아래 pull()이 이 시점에 실패하면 화면이 잠시 이전 가족 데이터로 남을 수 있음(로컬 스토어는
+        // 이미 정리된 상태) — 다음 부팅에서 자동으로 다시 맞춰짐. 재시도 큐까지는 v1 범위 밖.
+        await store.clearFamilyData()
+        await store.setMeta('familyId', authoritativeFamilyId)
+        await store.setMeta('userId', user.id)
+        await pull(authoritativeFamilyId)
+        await loadLocalData(authoritativeFamilyId, user.id, false)
+        return
+      }
+
+      await store.setMeta('userId', user.id) // 같은 기기를 다른 가족 구성원이 잠금해제한 경우 대비 최신화
+      await syncNow(cachedFamilyId)
+      await loadLocalData(cachedFamilyId, user.id, false)
+    } catch {
+      setData((d) => d && { ...d, offline: true })
+    }
   }
 
   async function loadLocalData(familyId: string, userId: string, offline: boolean) {
