@@ -268,77 +268,66 @@ header{
 .item-del{color:var(--ink-soft);font-size:13px;padding:4px}
 .item-del:hover{color:var(--danger)}
 .dp-empty{color:var(--ink-soft);font-size:12.5px;text-align:center;padding:18px 0}
-/* ---------- 수납장 칸(compartment) 트리 ---------- */
-.cmp-add{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding-bottom:10px;border-bottom:1px dashed var(--line)}
-.cmp-chip{padding:5px 10px;border-radius:var(--r-pill,9999px);background:var(--accent-soft);color:var(--accent-ink);font-size:12px;font-weight:700}
-.cmp-chip:hover{opacity:.85}
-.cmp-add-form{display:flex;gap:4px;flex:1;min-width:120px}
-.cmp-add-form input{flex:1;min-width:0;padding:6px 9px;border-radius:8px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-size:12.5px;outline:none}
-.cmp-add-form input:focus{border-color:var(--accent)}
-.cmp-add-form button{padding:6px 10px;border-radius:8px;background:var(--bg);color:var(--ink-soft);font-size:12px;font-weight:700;flex-shrink:0}
-.cmp-add-form button:disabled{opacity:.5}
-.cmp-group{display:flex;flex-direction:column;gap:6px}
-.cmp-head{display:flex;align-items:center;gap:6px}
-.cmp-name{flex:1;min-width:0;font-size:12.5px;font-weight:800;color:var(--ink);background:transparent;border:none;border-bottom:1.5px solid transparent;outline:none;padding:2px 0}
-.cmp-name:focus{border-bottom-color:var(--accent)}
-.cmp-name-static{flex:1;font-size:12.5px;font-weight:800;color:var(--ink-soft)}
-.cmp-count{font-size:11px;color:var(--ink-soft);background:var(--bg);border-radius:9px;padding:1px 7px;flex-shrink:0}
-.cmp-add-here,.cmp-del{font-size:12.5px;padding:2px 5px;color:var(--ink-soft);flex-shrink:0}
-.cmp-add-here:hover{color:var(--accent)}
-.cmp-del:hover{color:var(--danger)}
-.cmp-empty{font-size:11.5px;color:var(--ink-soft);padding:1px 0 4px 4px}
-.cmp-select{
-  width:100%;padding:9px 11px;border-radius:9px;border:1.5px solid var(--line);
-  background:var(--surface);color:var(--ink);font-size:13.5px;outline:none;
-}
-.cmp-select:focus{border-color:var(--accent)}
-
-/* ---------- 뷰 토글 + 목록(트리) 뷰 ---------- */
+/* ---------- 뷰 토글 ---------- */
 .viewtabs{display:flex;gap:6px;padding:10px 16px;background:var(--paper);border-bottom:1px solid var(--line);flex-shrink:0}
 .viewtabs button{padding:7px 16px;border-radius:var(--r-pill,9999px);font-size:13.5px;font-weight:700;background:var(--bg);color:var(--ink-soft);border:1.5px solid transparent}
 .viewtabs button.active{background:var(--accent-soft);color:var(--accent-ink);border-color:var(--accent)}
 
-.tree-view{flex:1;min-height:0;overflow-y:auto;padding:12px}
-.home-tree{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:1px}
+/* ---------- 목록(트리) 뷰 — 깔끔한 파일트리 스타일 ---------- */
+.tree-view{flex:1;min-height:0;overflow-y:auto;padding:16px 12px}
+.home-tree{max-width:620px;margin:0 auto;display:flex;flex-direction:column}
 .tree-empty{color:var(--ink-soft);font-size:13px;text-align:center;padding:24px 0}
+.tnode{display:flex;flex-direction:column}
+.cmp-content{display:flex;flex-direction:column}
 
-.tree-row{display:flex;align-items:center;gap:6px;padding:6px 4px;border-radius:8px}
-.tree-row:hover{background:var(--bg)}
-.tree-emoji{font-size:15px;flex-shrink:0}
-.tree-name{flex:1;min-width:0;font-size:14px;font-weight:700;color:var(--ink);background:transparent;border:none;border-bottom:1.5px solid transparent;outline:none;padding:2px 0}
-.tree-name:focus{border-bottom-color:var(--accent)}
-
-.cmp-tree{display:flex;flex-direction:column;gap:1px;padding:1px 0}
-.cmp-node{display:flex;flex-direction:column}
-.cmp-row{display:flex;align-items:center;gap:6px;padding:4px;border-radius:8px}
-.cmp-row:hover{background:var(--bg)}
-.cmp-twist{font-size:11px;color:var(--ink-soft);width:16px;flex-shrink:0;text-align:center}
-
-.del-confirm{display:flex;gap:4px;flex-shrink:0}
-.del-confirm button{font-size:11px;padding:2px 8px;border-radius:7px;font-weight:700}
+/* 행: [caret][아이콘][이름] … 우측 액션은 hover 시에만 */
+.trow{display:flex;align-items:center;gap:6px;height:30px;padding:0 6px;border-radius:7px}
+.trow:hover{background:var(--bg)}
+.trow-caret{width:14px;flex-shrink:0;font-size:9px;color:var(--ink-soft);text-align:center;line-height:1;cursor:pointer;user-select:none}
+.trow-ico{flex-shrink:0;font-size:14px;cursor:pointer;line-height:1}
+.trow-name{flex:1;min-width:0;font-size:13.5px;color:var(--ink);background:transparent;border:none;outline:none;padding:0;text-overflow:ellipsis}
+.trow-name::placeholder{color:var(--ink-soft)}
+.trow.lv-room .trow-name{font-weight:700}
+.trow.lv-storage .trow-name{font-weight:600}
+.trow-name:focus{background:var(--surface);box-shadow:0 0 0 1.5px var(--accent);border-radius:5px}
+.trow-meta{font-size:11px;color:var(--ink-soft);flex-shrink:0;margin-left:6px}
+.trow:hover .trow-meta{display:none}
+.trow-actions{display:none;align-items:center;gap:2px;flex-shrink:0;margin-left:6px}
+.trow:hover .trow-actions{display:flex}
+.trow-act{font-size:11px;font-weight:600;color:var(--ink-soft);padding:3px 7px;border-radius:6px;white-space:nowrap}
+.trow-act:hover{background:var(--accent-soft);color:var(--accent-ink)}
+.trow-del{font-size:12px;padding:3px 5px;color:var(--ink-soft);border-radius:6px}
+.trow-del:hover{background:var(--danger);color:#fff}
+.del-confirm{display:flex;gap:3px}
+.del-confirm button{font-size:11px;padding:2px 7px;border-radius:6px;font-weight:700}
 .del-yes{background:var(--danger);color:#fff}
 .btn-ghost{background:var(--bg);color:var(--ink-soft)}
 
-.tree-item{display:flex;align-items:center;gap:8px;padding:4px;border-radius:8px}
-.tree-item:hover{background:var(--bg)}
-.tree-item-thumb{width:26px;height:26px;border-radius:7px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:15px;overflow:hidden;flex-shrink:0}
-.tree-item-thumb img{width:100%;height:100%;object-fit:cover}
-.tree-item-body{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}
-.tree-item-name{font-size:13px;font-weight:600;color:var(--ink)}
-.tree-item-memo{font-size:11px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tree-item-by{font-size:10px;color:var(--ink-soft)}
+/* 물건 행(단일 라인) */
+.titem{display:flex;align-items:center;gap:8px;height:30px;padding:0 6px;border-radius:7px}
+.titem:hover{background:var(--bg)}
+.titem-thumb{width:20px;height:20px;border-radius:5px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;overflow:hidden;flex-shrink:0}
+.titem-thumb img{width:100%;height:100%;object-fit:cover}
+.titem-name{font-size:13px;color:var(--ink);flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%}
+.titem-memo{font-size:11.5px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.titem .trow-del{display:none;margin-left:auto}
+.titem:hover .trow-del{display:block}
 
-.node-add{display:flex;gap:6px;padding:3px 4px}
-.node-add button{font-size:11.5px;font-weight:700;color:var(--accent-ink);padding:3px 9px;border-radius:7px;background:var(--accent-soft)}
-.node-add button:hover{opacity:.85}
-.node-add-form{display:flex;flex-wrap:wrap;gap:4px;padding:4px;align-items:center}
-.node-add-form input[type=text]{padding:6px 9px;border-radius:8px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-size:12.5px;outline:none;min-width:100px;flex:1}
-.node-add-form input[type=text]:focus{border-color:var(--accent)}
-.node-add-form button{font-size:12px;font-weight:700;padding:6px 10px;border-radius:8px;background:var(--accent);color:#fff;flex-shrink:0}
-.node-add-form button.btn-ghost{background:var(--bg);color:var(--ink-soft)}
-.node-add-form button:disabled{opacity:.5}
-.node-photo{display:inline-flex;align-items:center;font-size:12px;padding:6px 10px;border-radius:8px;border:1.5px dashed var(--line);color:var(--ink-soft);cursor:pointer;flex-shrink:0}
-.node-photo.has{border-style:solid;border-color:var(--green);color:var(--green)}
+/* 인라인 추가 폼(요청 시에만 등장) */
+.tadd-form{display:flex;flex-wrap:wrap;gap:5px;align-items:center;padding:3px 6px}
+.tadd-form input[type=text]{padding:6px 9px;border-radius:7px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-size:12.5px;outline:none;flex:1;min-width:110px}
+.tadd-form input[type=text]:focus{border-color:var(--accent)}
+.tadd-form button{font-size:12px;font-weight:700;padding:6px 11px;border-radius:7px;background:var(--accent);color:#fff;flex-shrink:0}
+.tadd-form button.btn-ghost{background:var(--bg);color:var(--ink-soft)}
+.tadd-form button:disabled{opacity:.5}
+.tadd-photo{display:inline-flex;align-items:center;font-size:12px;padding:6px 10px;border-radius:7px;border:1.5px dashed var(--line);color:var(--ink-soft);cursor:pointer;flex-shrink:0}
+.tadd-photo.has{border-style:solid;border-color:var(--green);color:var(--green)}
+
+/* 드로어(도식화) 상단 칸/물건 추가 · 최하단 방 추가 */
+.dp-actions{display:flex;gap:4px;padding:2px 4px 6px}
+.tree-add-root{margin-top:8px;padding:0 6px}
+.tree-add-root button{font-size:12.5px;font-weight:600;color:var(--ink-soft);padding:6px 10px;border-radius:7px}
+.tree-add-root button:hover{background:var(--accent-soft);color:var(--accent-ink)}
 .dp-form{border-top:1px solid var(--line);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
 .dp-form .row{display:flex;gap:8px}
 .dp-form input[type=text]{

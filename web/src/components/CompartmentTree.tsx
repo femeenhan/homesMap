@@ -4,7 +4,10 @@ import { useState } from 'react'
 import type { Storage, DecItem, FamilyMember, Compartment } from '@/lib/types'
 import { childCompartments } from '@/lib/compartments'
 
-// 인라인 확인 삭제(연쇄삭제 방지턱). 🗑️ → "삭제/취소" 2단계. 방·수납장·칸 공용.
+type AddDraft = { name: string; memo: string; photoFile?: File }
+const pad = (d: number) => ({ paddingLeft: d * 16 + 6 })
+
+// 인라인 확인 삭제. 평소엔 🗑️(hover 시 노출), 누르면 삭제/취소 2단계. 방·수납장·칸·물건 공용.
 export function DeleteBtn({ title, onConfirm }: { title: string; onConfirm: () => void }) {
   const [confirming, setConfirming] = useState(false)
   if (confirming) {
@@ -15,10 +18,70 @@ export function DeleteBtn({ title, onConfirm }: { title: string; onConfirm: () =
       </span>
     )
   }
-  return <button type="button" className="cmp-del" title={title} onClick={() => setConfirming(true)}>🗑️</button>
+  return <button type="button" className="trow-del" title={title} onClick={() => setConfirming(true)}>🗑️</button>
 }
 
-type AddDraft = { name: string; memo: string; photoFile?: File }
+// 이름 하나 받는 인라인 폼(칸·수납장·방 추가 공용)
+export function InlineInput({ depth, placeholder, onSubmit, onCancel }: {
+  depth: number; placeholder: string; onSubmit: (name: string) => void; onCancel: () => void
+}) {
+  const [v, setV] = useState('')
+  return (
+    <form className="tadd-form" style={pad(depth)} onSubmit={(e) => { e.preventDefault(); const n = v.trim(); if (n) { onSubmit(n); setV('') } }}>
+      <input autoFocus type="text" placeholder={placeholder} maxLength={20} value={v}
+        onChange={(e) => setV(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') onCancel() }} />
+      <button type="submit" disabled={!v.trim()}>추가</button>
+      <button type="button" className="btn-ghost" onClick={onCancel}>취소</button>
+    </form>
+  )
+}
+
+// 물건 추가 인라인 폼(이름/메모/사진)
+export function InlineItemForm({ depth, onSubmit, onCancel }: {
+  depth: number; onSubmit: (d: AddDraft) => void | Promise<void>; onCancel: () => void
+}) {
+  const [name, setName] = useState('')
+  const [memo, setMemo] = useState('')
+  const [photo, setPhoto] = useState<File | null>(null)
+  const [busy, setBusy] = useState(false)
+  return (
+    <form className="tadd-form" style={pad(depth)}
+      onSubmit={async (e) => {
+        e.preventDefault()
+        if (!name.trim() || busy) return
+        setBusy(true)
+        try { await onSubmit({ name: name.trim(), memo: memo.trim(), photoFile: photo ?? undefined }) } finally { setBusy(false) }
+      }}
+    >
+      <input autoFocus type="text" placeholder="물건 이름" maxLength={30} value={name}
+        onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') onCancel() }} />
+      <input type="text" placeholder="메모 (선택)" maxLength={40} value={memo} onChange={(e) => setMemo(e.target.value)} />
+      <label className={`tadd-photo${photo ? ' has' : ''}`}>{photo ? '✅ 사진' : '📷'}
+        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
+      </label>
+      <button type="submit" disabled={!name.trim() || busy}>등록</button>
+      <button type="button" className="btn-ghost" onClick={onCancel}>취소</button>
+    </form>
+  )
+}
+
+function ItemRow({ item, photoUrl, depth, onDelete }: {
+  item: DecItem; photoUrl?: string; depth: number; onDelete: (i: DecItem) => void
+}) {
+  return (
+    <div className="titem" style={pad(depth)}>
+      <span className="titem-thumb">
+        {photoUrl
+          // eslint-disable-next-line @next/next/no-img-element -- blob: objectURL
+          ? <img src={photoUrl} alt="" />
+          : (item.emoji || '📦')}
+      </span>
+      <span className="titem-name">{item.name}{item.photo_path && !photoUrl ? ' 📷' : ''}</span>
+      {item.memo && <span className="titem-memo">{item.memo}</span>}
+      <DeleteBtn title="물건 삭제" onConfirm={() => onDelete(item)} />
+    </div>
+  )
+}
 
 type Handlers = {
   onCompartmentsChange: (compartments: Compartment[]) => void
@@ -26,16 +89,16 @@ type Handlers = {
   onAddItem: (compartmentId: string | null, draft: AddDraft) => void | Promise<void>
   onDeleteItem: (item: DecItem) => void
 }
-
 type Props = Handlers & {
   storage: Storage
   items: DecItem[]
   members: FamilyMember[]
-  photoUrls?: Record<string, string> // 있으면 썸네일 표시(도식화 드로어), 없으면 이모지(목록 뷰)
+  photoUrls?: Record<string, string>
+  baseDepth?: number // 렌더 시작 들여쓰기(목록=2, 드로어=0)
 }
 
-// 수납장 하나의 칸 트리 + 물건. 목록 뷰(HomeTree)와 도식화 드로어(DetailPanel)가 공유.
-export function CompartmentTree({ storage, items, members, photoUrls, ...h }: Props) {
+// 수납장 하나의 칸 트리 + 물건(직속 포함). 목록/드로어 공유. 수납장 자체 행/추가는 호출측이 담당.
+export function CompartmentTree({ storage, items, members, photoUrls, baseDepth = 0, ...h }: Props) {
   const compartments = storage.compartments ?? []
   const validIds = new Set(compartments.map((c) => c.id))
   const directItems = items.filter((it) => !it.compartment_id || !validIds.has(it.compartment_id))
@@ -49,31 +112,18 @@ export function CompartmentTree({ storage, items, members, photoUrls, ...h }: Pr
   }
 
   return (
-    <div className="cmp-tree">
+    <div className="cmp-content">
       {roots.map((c) => (
         <CompartmentNode
-          key={c.id}
-          compartment={c}
-          compartments={compartments}
-          items={items}
-          members={members}
-          photoUrls={photoUrls}
-          depth={0}
-          onAddCompartment={addCompartment}
-          onRename={renameCompartment}
-          onDeleteCompartment={h.onDeleteCompartment}
-          onAddItem={h.onAddItem}
-          onDeleteItem={h.onDeleteItem}
+          key={c.id} compartment={c} compartments={compartments} items={items} members={members}
+          photoUrls={photoUrls} depth={baseDepth}
+          onAddCompartment={addCompartment} onRename={renameCompartment}
+          onDeleteCompartment={h.onDeleteCompartment} onAddItem={h.onAddItem} onDeleteItem={h.onDeleteItem}
         />
       ))}
       {directItems.map((it) => (
-        <ItemRow key={it.id} item={it} members={members} photoUrl={photoUrls?.[it.id]} depth={0} onDelete={h.onDeleteItem} />
+        <ItemRow key={it.id} item={it} photoUrl={photoUrls?.[it.id]} depth={baseDepth} onDelete={h.onDeleteItem} />
       ))}
-      <NodeAddBar
-        depth={0}
-        onAddCompartment={(name) => addCompartment(null, name)}
-        onAddItem={(draft) => h.onAddItem(null, draft)}
-      />
     </div>
   )
 }
@@ -95,125 +145,37 @@ type NodeProps = {
 function CompartmentNode(p: NodeProps) {
   const [expanded, setExpanded] = useState(false)
   const [name, setName] = useState(p.compartment.name)
+  const [adding, setAdding] = useState<'none' | 'cmp' | 'item'>('none')
   const children = childCompartments(p.compartments, p.compartment.id)
   const myItems = p.items.filter((it) => it.compartment_id === p.compartment.id)
+  const hasKids = children.length > 0 || myItems.length > 0
+  const toggle = () => setExpanded((e) => !e)
+  const startAdd = (m: 'cmp' | 'item') => { setExpanded(true); setAdding(m) }
 
   return (
-    <div className="cmp-node">
-      <div className="cmp-row" style={{ paddingLeft: p.depth * 14 }}>
-        <button type="button" className="cmp-twist" onClick={() => setExpanded((e) => !e)} aria-label={expanded ? '접기' : '펼치기'}>
-          {expanded ? '▾' : '▸'}
-        </button>
-        <input
-          className="cmp-name"
-          type="text"
-          aria-label="칸 이름"
-          value={name}
-          maxLength={20}
+    <div className="tnode">
+      <div className="trow" style={pad(p.depth)}>
+        <button type="button" className="trow-caret" onClick={toggle}>{hasKids ? (expanded ? '▼' : '▶') : ''}</button>
+        <span className="trow-ico" onClick={toggle}>📁</span>
+        <input className="trow-name" type="text" aria-label="칸 이름" value={name} maxLength={20}
           onChange={(e) => setName(e.target.value)}
           onBlur={() => { const n = name.trim(); if (n && n !== p.compartment.name) p.onRename(p.compartment.id, n); else setName(p.compartment.name) }}
-          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
-        />
-        <span className="cmp-count">{myItems.length}{children.length ? `·${children.length}칸` : ''}</span>
-        <DeleteBtn title="칸 삭제(하위 칸·물건 포함)" onConfirm={() => p.onDeleteCompartment(p.compartment.id)} />
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
+        {myItems.length > 0 && <span className="trow-meta">{myItems.length}</span>}
+        <span className="trow-actions">
+          <button type="button" className="trow-act" onClick={() => startAdd('cmp')}>＋칸</button>
+          <button type="button" className="trow-act" onClick={() => startAdd('item')}>＋물건</button>
+          <DeleteBtn title="칸 삭제(하위 칸·물건 포함)" onConfirm={() => p.onDeleteCompartment(p.compartment.id)} />
+        </span>
       </div>
       {expanded && (
         <>
-          {children.map((c) => (
-            <CompartmentNode {...p} key={c.id} compartment={c} depth={p.depth + 1} />
-          ))}
-          {myItems.map((it) => (
-            <ItemRow key={it.id} item={it} members={p.members} photoUrl={p.photoUrls?.[it.id]} depth={p.depth + 1} onDelete={p.onDeleteItem} />
-          ))}
-          <NodeAddBar
-            depth={p.depth + 1}
-            onAddCompartment={(n) => p.onAddCompartment(p.compartment.id, n)}
-            onAddItem={(draft) => p.onAddItem(p.compartment.id, draft)}
-          />
+          {adding === 'cmp' && <InlineInput depth={p.depth + 1} placeholder="새 칸 이름" onSubmit={(n) => { p.onAddCompartment(p.compartment.id, n); setAdding('none') }} onCancel={() => setAdding('none')} />}
+          {adding === 'item' && <InlineItemForm depth={p.depth + 1} onSubmit={async (d) => { await p.onAddItem(p.compartment.id, d); setAdding('none') }} onCancel={() => setAdding('none')} />}
+          {children.map((c) => <CompartmentNode {...p} key={c.id} compartment={c} depth={p.depth + 1} />)}
+          {myItems.map((it) => <ItemRow key={it.id} item={it} photoUrl={p.photoUrls?.[it.id]} depth={p.depth + 1} onDelete={p.onDeleteItem} />)}
         </>
       )}
     </div>
-  )
-}
-
-function ItemRow({ item, members, photoUrl, depth, onDelete }: {
-  item: DecItem; members: FamilyMember[]; photoUrl?: string; depth: number; onDelete: (item: DecItem) => void
-}) {
-  const by = members.find((m) => m.user_id === item.created_by)
-  return (
-    <div className="tree-item" style={{ paddingLeft: depth * 14 + 20 }}>
-      <span className="tree-item-thumb">
-        {photoUrl
-          // eslint-disable-next-line @next/next/no-img-element -- blob: objectURL
-          ? <img src={photoUrl} alt="" />
-          : (item.emoji || '📦')}
-      </span>
-      <span className="tree-item-body">
-        <span className="tree-item-name">{item.name}{item.photo_path && !photoUrl ? ' 📷' : ''}</span>
-        {item.memo && <span className="tree-item-memo">{item.memo}</span>}
-        {by && <span className="tree-item-by">{by.emoji} {by.display_name}</span>}
-      </span>
-      <button type="button" className="item-del" title="삭제" onClick={() => onDelete(item)}>🗑️</button>
-    </div>
-  )
-}
-
-function NodeAddBar({ depth, onAddCompartment, onAddItem }: {
-  depth: number
-  onAddCompartment: (name: string) => void
-  onAddItem: (draft: AddDraft) => void | Promise<void>
-}) {
-  const [mode, setMode] = useState<'none' | 'cmp' | 'item'>('none')
-  const [cmpName, setCmpName] = useState('')
-  const [name, setName] = useState('')
-  const [memo, setMemo] = useState('')
-  const [photoFile, setPhotoFile] = useState<File | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-
-  function reset() { setMode('none'); setCmpName(''); setName(''); setMemo(''); setPhotoFile(null) }
-
-  if (mode === 'none') {
-    return (
-      <div className="node-add" style={{ paddingLeft: depth * 14 + 20 }}>
-        <button type="button" onClick={() => setMode('cmp')}>＋ 칸</button>
-        <button type="button" onClick={() => setMode('item')}>＋ 물건</button>
-      </div>
-    )
-  }
-
-  if (mode === 'cmp') {
-    return (
-      <form
-        className="node-add-form"
-        style={{ paddingLeft: depth * 14 + 20 }}
-        onSubmit={(e) => { e.preventDefault(); const n = cmpName.trim(); if (n) onAddCompartment(n); reset() }}
-      >
-        <input autoFocus type="text" placeholder="새 칸 이름" maxLength={20} value={cmpName} onChange={(e) => setCmpName(e.target.value)} />
-        <button type="submit" disabled={!cmpName.trim()}>추가</button>
-        <button type="button" className="btn-ghost" onClick={reset}>취소</button>
-      </form>
-    )
-  }
-
-  return (
-    <form
-      className="node-add-form item"
-      style={{ paddingLeft: depth * 14 + 20 }}
-      onSubmit={async (e) => {
-        e.preventDefault()
-        if (!name.trim() || submitting) return
-        setSubmitting(true)
-        try { await onAddItem({ name: name.trim(), memo: memo.trim(), photoFile: photoFile ?? undefined }) } finally { reset() }
-      }}
-    >
-      <input autoFocus type="text" placeholder="물건 이름" maxLength={30} value={name} onChange={(e) => setName(e.target.value)} />
-      <input type="text" placeholder="메모 (선택)" maxLength={40} value={memo} onChange={(e) => setMemo(e.target.value)} />
-      <label className={`node-photo${photoFile ? ' has' : ''}`}>
-        {photoFile ? '✅ 사진' : '📷 사진'}
-        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)} />
-      </label>
-      <button type="submit" disabled={!name.trim() || submitting}>등록</button>
-      <button type="button" className="btn-ghost" onClick={reset}>취소</button>
-    </form>
   )
 }

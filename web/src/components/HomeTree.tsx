@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import type { Room, Storage, DecItem, FamilyMember, Compartment } from '@/lib/types'
-import { CompartmentTree, DeleteBtn } from './CompartmentTree'
+import { CompartmentTree, DeleteBtn, InlineInput, InlineItemForm } from './CompartmentTree'
 
 type AddDraft = { name: string; memo: string; photoFile?: File }
+const pad = (d: number) => ({ paddingLeft: d * 16 + 6 })
 
 type Props = {
   rooms: Room[]
@@ -25,15 +26,16 @@ type Props = {
 
 // 집 전체 아코디언: 방 → 수납장 → 칸(무한중첩) → 물건. 카테고리화의 본체(목록 뷰).
 export function HomeTree(p: Props) {
+  const [addingRoom, setAddingRoom] = useState(false)
   return (
     <div className="home-tree">
-      {p.rooms.length === 0 && (
-        <div className="tree-empty">아직 방이 없어요. 아래에서 첫 방을 추가해보세요.</div>
+      {p.rooms.length === 0 && <div className="tree-empty">아직 방이 없어요. 아래 &lsquo;방 추가&rsquo;로 시작해보세요.</div>}
+      {p.rooms.map((room) => <TreeRoom key={room.id} room={room} {...p} />)}
+      {addingRoom ? (
+        <InlineInput depth={0} placeholder="방 이름 (예: 안방, 거실)" onSubmit={(n) => { p.onAddRoom(n); setAddingRoom(false) }} onCancel={() => setAddingRoom(false)} />
+      ) : (
+        <div className="tree-add-root"><button type="button" onClick={() => setAddingRoom(true)}>＋ 방 추가</button></div>
       )}
-      {p.rooms.map((room) => (
-        <TreeRoom key={room.id} room={room} {...p} />
-      ))}
-      <InlineNameAdd label="＋ 방 추가" placeholder="방 이름 (예: 안방, 거실)" onAdd={p.onAddRoom} depth={0} />
     </div>
   )
 }
@@ -41,29 +43,28 @@ export function HomeTree(p: Props) {
 function TreeRoom({ room, ...p }: { room: Room } & Props) {
   const [expanded, setExpanded] = useState(false)
   const [name, setName] = useState(room.name)
+  const [adding, setAdding] = useState(false)
   const storages = p.storages.filter((s) => s.room_id === room.id)
+  const toggle = () => setExpanded((e) => !e)
   return (
-    <div className="tree-room">
-      <div className="tree-row">
-        <button type="button" className="cmp-twist" onClick={() => setExpanded((e) => !e)} aria-label={expanded ? '접기' : '펼치기'}>
-          {expanded ? '▾' : '▸'}
-        </button>
-        <span className="tree-emoji">🏠</span>
-        <input
-          className="tree-name" type="text" aria-label="방 이름" value={name} maxLength={20}
+    <div className="tnode">
+      <div className="trow lv-room" style={pad(0)}>
+        <button type="button" className="trow-caret" onClick={toggle}>{storages.length ? (expanded ? '▼' : '▶') : ''}</button>
+        <span className="trow-ico" onClick={toggle}>🏠</span>
+        <input className="trow-name" type="text" aria-label="방 이름" value={name} maxLength={20}
           onChange={(e) => setName(e.target.value)}
           onBlur={() => { const n = name.trim(); if (n && n !== room.name) p.onRenameRoom(room, n); else setName(room.name) }}
-          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
-        />
-        <span className="cmp-count">{storages.length}칸</span>
-        <DeleteBtn title="방 삭제(안의 수납장·물건 포함)" onConfirm={() => p.onDeleteRoom(room)} />
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
+        {storages.length > 0 && <span className="trow-meta">{storages.length}</span>}
+        <span className="trow-actions">
+          <button type="button" className="trow-act" onClick={() => { setExpanded(true); setAdding(true) }}>＋수납장</button>
+          <DeleteBtn title="방 삭제(수납장·물건 포함)" onConfirm={() => p.onDeleteRoom(room)} />
+        </span>
       </div>
       {expanded && (
         <>
-          {storages.map((storage) => (
-            <TreeStorage key={storage.id} storage={storage} room={room} {...p} />
-          ))}
-          <InlineNameAdd label="＋ 수납장 추가" placeholder="수납장 이름 (예: 서랍장1)" onAdd={(n) => p.onAddStorage(room, n)} depth={1} />
+          {adding && <InlineInput depth={1} placeholder="수납장 이름 (예: 서랍장1)" onSubmit={(n) => { p.onAddStorage(room, n); setAdding(false) }} onCancel={() => setAdding(false)} />}
+          {storages.map((s) => <TreeStorage key={s.id} storage={s} room={room} {...p} />)}
         </>
       )}
     </div>
@@ -73,61 +74,41 @@ function TreeRoom({ room, ...p }: { room: Room } & Props) {
 function TreeStorage({ storage, ...p }: { storage: Storage; room: Room } & Props) {
   const [expanded, setExpanded] = useState(false)
   const [name, setName] = useState(storage.name)
+  const [adding, setAdding] = useState<'none' | 'cmp' | 'item'>('none')
   const items = p.decItems.filter((it) => it.storage_id === storage.id)
+  const compartments = storage.compartments ?? []
+  const hasKids = compartments.length > 0 || items.length > 0
+  const toggle = () => setExpanded((e) => !e)
+  const startAdd = (m: 'cmp' | 'item') => { setExpanded(true); setAdding(m) }
   return (
-    <div className="tree-storage">
-      <div className="tree-row" style={{ paddingLeft: 14 }}>
-        <button type="button" className="cmp-twist" onClick={() => setExpanded((e) => !e)} aria-label={expanded ? '접기' : '펼치기'}>
-          {expanded ? '▾' : '▸'}
-        </button>
-        <span className="tree-emoji">📦</span>
-        <input
-          className="tree-name" type="text" aria-label="수납장 이름" value={name} maxLength={20}
+    <div className="tnode">
+      <div className="trow lv-storage" style={pad(1)}>
+        <button type="button" className="trow-caret" onClick={toggle}>{hasKids ? (expanded ? '▼' : '▶') : ''}</button>
+        <span className="trow-ico" onClick={toggle}>📦</span>
+        <input className="trow-name" type="text" aria-label="수납장 이름" value={name} maxLength={20}
           onChange={(e) => setName(e.target.value)}
           onBlur={() => { const n = name.trim(); if (n && n !== storage.name) p.onRenameStorage(storage, n); else setName(storage.name) }}
-          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
-        />
-        <span className="cmp-count">{items.length}</span>
-        <DeleteBtn title="수납장 삭제(안의 물건 포함)" onConfirm={() => p.onDeleteStorage(storage)} />
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
+        {items.length > 0 && <span className="trow-meta">{items.length}</span>}
+        <span className="trow-actions">
+          <button type="button" className="trow-act" onClick={() => startAdd('cmp')}>＋칸</button>
+          <button type="button" className="trow-act" onClick={() => startAdd('item')}>＋물건</button>
+          <DeleteBtn title="수납장 삭제(물건 포함)" onConfirm={() => p.onDeleteStorage(storage)} />
+        </span>
       </div>
       {expanded && (
-        <div style={{ paddingLeft: 14 }}>
+        <>
+          {adding === 'cmp' && <InlineInput depth={2} placeholder="새 칸 이름" onSubmit={(n) => { p.onCompartmentsChange(storage, [...compartments, { id: crypto.randomUUID(), name: n, parent_id: null }]); setAdding('none') }} onCancel={() => setAdding('none')} />}
+          {adding === 'item' && <InlineItemForm depth={2} onSubmit={async (d) => { await p.onAddItem(storage, null, d); setAdding('none') }} onCancel={() => setAdding('none')} />}
           <CompartmentTree
-            storage={storage}
-            items={items}
-            members={p.members}
+            storage={storage} items={items} members={p.members} baseDepth={2}
             onCompartmentsChange={(c) => p.onCompartmentsChange(storage, c)}
             onDeleteCompartment={(id) => p.onDeleteCompartment(storage, id)}
-            onAddItem={(compartmentId, draft) => p.onAddItem(storage, compartmentId, draft)}
+            onAddItem={(cid, d) => p.onAddItem(storage, cid, d)}
             onDeleteItem={p.onDeleteItem}
           />
-        </div>
+        </>
       )}
     </div>
-  )
-}
-
-function InlineNameAdd({ label, placeholder, onAdd, depth }: {
-  label: string; placeholder: string; onAdd: (name: string) => void; depth: number
-}) {
-  const [open, setOpen] = useState(false)
-  const [name, setName] = useState('')
-  if (!open) {
-    return (
-      <div className="node-add" style={{ paddingLeft: depth * 14 + 20 }}>
-        <button type="button" onClick={() => setOpen(true)}>{label}</button>
-      </div>
-    )
-  }
-  return (
-    <form
-      className="node-add-form"
-      style={{ paddingLeft: depth * 14 + 20 }}
-      onSubmit={(e) => { e.preventDefault(); const n = name.trim(); if (n) onAdd(n); setName(''); setOpen(false) }}
-    >
-      <input autoFocus type="text" placeholder={placeholder} maxLength={20} value={name} onChange={(e) => setName(e.target.value)} />
-      <button type="submit" disabled={!name.trim()}>추가</button>
-      <button type="button" className="btn-ghost" onClick={() => { setName(''); setOpen(false) }}>취소</button>
-    </form>
   )
 }

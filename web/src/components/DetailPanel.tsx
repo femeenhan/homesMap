@@ -7,7 +7,7 @@ import { decryptBytes } from '@/lib/crypto'
 import { keys } from '@/lib/keys'
 import { createClient } from '@/lib/supabase/client'
 import { Modal } from './Modal'
-import { CompartmentTree } from './CompartmentTree'
+import { CompartmentTree, InlineInput, InlineItemForm } from './CompartmentTree'
 
 type Props = {
   storage: Storage
@@ -29,6 +29,7 @@ export function DetailPanel({ storage, room, items, members, onClose, onRename, 
   const meta = STORAGE_TYPES.find((s) => s.type === storage.type)
   const [storageName, setStorageName] = useState(storage.name)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [adding, setAdding] = useState<'none' | 'cmp' | 'item'>('none')
 
   // 사진 지연 로드 캐시: item id -> objectURL(성공) / photoErrors(실패는 이모지 폴백)
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
@@ -101,11 +102,26 @@ export function DetailPanel({ storage, room, items, members, onClose, onRename, 
       </div>
 
       <div className="dp-items">
+        <div className="dp-actions">
+          <button type="button" className="trow-act" onClick={() => setAdding('cmp')}>＋ 칸</button>
+          <button type="button" className="trow-act" onClick={() => setAdding('item')}>＋ 물건</button>
+        </div>
+        {adding === 'cmp' && (
+          <InlineInput depth={0} placeholder="새 칸 이름"
+            onSubmit={(n) => { onCompartmentsChange([...(storage.compartments ?? []), { id: crypto.randomUUID(), name: n, parent_id: null }]); setAdding('none') }}
+            onCancel={() => setAdding('none')} />
+        )}
+        {adding === 'item' && (
+          <InlineItemForm depth={0}
+            onSubmit={async (d) => { await onItemsAdd([{ ...d, compartmentId: null }]); setAdding('none') }}
+            onCancel={() => setAdding('none')} />
+        )}
         <CompartmentTree
           storage={storage}
           items={items}
           members={members}
           photoUrls={photoUrls}
+          baseDepth={0}
           onCompartmentsChange={onCompartmentsChange}
           onDeleteCompartment={onDeleteCompartment}
           onAddItem={(compartmentId, draft) => onItemsAdd([{ ...draft, compartmentId }])}
