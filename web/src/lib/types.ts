@@ -21,6 +21,8 @@ export type Item = {
 export type DecItem = Omit<Item, 'enc_name' | 'enc_memo'> & { name: string; memo: string }
 export type Activity = { id: UUID; family_id: UUID; actor_id: UUID; kind: string; enc_payload: string; created_at: string }
 
+export type Mode = 'select' | 'room' | 'storage'
+
 export type StorageTypeKey = 'drawer' | 'closet' | 'shelf' | 'fridge' | 'box' | 'shoe'
 export const STORAGE_TYPES: { type: StorageTypeKey; em: string; label: string }[] = [
   { type: 'drawer', em: '🗄️', label: '서랍장' }, { type: 'closet', em: '🚪', label: '옷장' },

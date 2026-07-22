@@ -1,25 +1,18 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { createInviteLink } from '@/lib/keys'
 import type { FamilyMember } from '@/lib/types'
 
 type Props = {
   familyId: string
   members: FamilyMember[]
+  onToast: (msg: string) => void
 }
 
-export function Header({ familyId, members }: Props) {
-  const [toastMsg, setToastMsg] = useState<string | null>(null)
+export function Header({ familyId, members, onToast }: Props) {
   const [fallbackLink, setFallbackLink] = useState<string | null>(null)
   const [inviting, setInviting] = useState(false)
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  function showToast(msg: string) {
-    setToastMsg(msg)
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setToastMsg(null), 2400)
-  }
 
   async function handleInvite() {
     setInviting(true)
@@ -28,12 +21,12 @@ export function Header({ familyId, members }: Props) {
       const link = await createInviteLink(familyId)
       try {
         await navigator.clipboard.writeText(link)
-        showToast('초대 링크를 복사했어요. 가족에게만 공유하세요!')
+        onToast('초대 링크를 복사했어요. 가족에게만 공유하세요!')
       } catch {
         setFallbackLink(link)
       }
     } catch {
-      showToast('초대 링크를 만들지 못했어요. 잠시 후 다시 시도해주세요.')
+      onToast('초대 링크를 만들지 못했어요. 잠시 후 다시 시도해주세요.')
     } finally {
       setInviting(false)
     }
@@ -84,7 +77,6 @@ export function Header({ familyId, members }: Props) {
           </button>
         </div>
       )}
-      <div className={`toast${toastMsg ? ' show' : ''}`}>{toastMsg}</div>
     </>
   )
 }

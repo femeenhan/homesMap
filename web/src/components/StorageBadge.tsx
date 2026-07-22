@@ -14,7 +14,11 @@ export function StorageBadge({ storage, itemCount, onClick }: Props) {
       type="button"
       className="storage"
       style={{ left: storage.x, top: storage.y }}
-      onClick={onClick ? () => onClick(storage.id) : undefined}
+      onClick={(e) => {
+        // 지도(mode-aware mousedown/click)로 버블링돼 방 그리기·수납장 배치가 오작동하지 않도록 항상 차단
+        e.stopPropagation()
+        onClick?.(storage.id)
+      }}
     >
       <span className="badge">
         {meta?.em ?? '📦'}
