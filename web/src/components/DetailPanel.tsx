@@ -14,6 +14,7 @@ type Props = {
   items: DecItem[]
   members: FamilyMember[]
   onClose: () => void
+  onRename: (name: string) => void
   onItemsAdd: (drafts: ItemDraft[]) => Promise<void> | void
   onItemDelete: (item: DecItem) => Promise<void> | void
   onStorageDelete: (storage: Storage) => Promise<void> | void
@@ -21,8 +22,10 @@ type Props = {
 
 /** 프로토타입 openStorage 패널 이식. page.tsx가 key={storage.id}로 렌더하므로
  *  다른 수납장을 선택하면 이 컴포넌트가 통째로 리마운트돼 사진 캐시가 자연히 초기화된다. */
-export function DetailPanel({ storage, room, items, members, onClose, onItemsAdd, onItemDelete, onStorageDelete }: Props) {
+export function DetailPanel({ storage, room, items, members, onClose, onRename, onItemsAdd, onItemDelete, onStorageDelete }: Props) {
   const meta = STORAGE_TYPES.find((s) => s.type === storage.type)
+  // 수납장 이름 편집(page가 key={storage.id}로 리마운트하므로 초기값만으로 다른 수납장 전환이 반영됨)
+  const [storageName, setStorageName] = useState(storage.name)
   const [name, setName] = useState('')
   const [memo, setMemo] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -102,7 +105,16 @@ export function DetailPanel({ storage, room, items, members, onClose, onItemsAdd
       <div className="dp-head">
         <button type="button" className="dp-close" onClick={onClose}>✕</button>
         <div className="dp-icon">{meta?.em ?? '📦'}</div>
-        <div className="dp-name">{storage.name}</div>
+        <input
+          className="dp-name-input"
+          type="text"
+          aria-label="수납장 이름"
+          value={storageName}
+          maxLength={20}
+          onChange={(e) => setStorageName(e.target.value)}
+          onBlur={() => { const n = storageName.trim(); if (n && n !== storage.name) onRename(n); else setStorageName(storage.name) }}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+        />
         <div className="dp-loc">
           📍 {room?.name ?? '위치 미지정'} · {meta?.label ?? ''} · 물건 {items.length}개
         </div>

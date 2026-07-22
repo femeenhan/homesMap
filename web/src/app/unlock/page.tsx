@@ -84,16 +84,16 @@ export default function UnlockPage() {
 
       {errorMsg && (
         <>
-          <p style={{ color: '#c00', margin: 0 }}>{errorMsg}</p>
+          <p style={{ color: 'var(--danger)', margin: 0 }}>{errorMsg}</p>
 
-          <p style={{ color: '#666', fontSize: '13px', margin: 0 }}>
+          <p style={{ color: 'var(--ink-soft)', fontSize: '13px', margin: 0 }}>
             다른 가족 구성원에게 새 초대 링크를 받아 다시 참여할 수도 있어요.
           </p>
 
           <button
             type="button"
             onClick={() => setShowRecovery((v) => !v)}
-            style={{ padding: '8px', fontSize: '14px', background: 'transparent', border: '1px solid #ccc' }}
+            style={{ padding: '8px', fontSize: '14px', background: 'transparent', border: '1px solid var(--line)' }}
           >
             복구코드로 열기
           </button>
@@ -129,7 +129,7 @@ export default function UnlockPage() {
               >
                 {recoverySubmitting ? '복구하는 중…' : '복구코드로 잠금해제'}
               </button>
-              {recoveryErrorMsg && <p style={{ color: '#c00', margin: 0 }}>{recoveryErrorMsg}</p>}
+              {recoveryErrorMsg && <p style={{ color: 'var(--danger)', margin: 0 }}>{recoveryErrorMsg}</p>}
             </form>
           )}
         </>

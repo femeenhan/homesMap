@@ -6,18 +6,19 @@ type Props = {
   storage: Storage
   itemCount: number
   found?: boolean
+  selected?: boolean
   pos?: Pt // 드래그 중 프리뷰 위치(없으면 storage 자체)
   onClick?: (storageId: string) => void
   onMoveStart?: (storage: Storage, e: React.PointerEvent) => void
 }
 
-export function StorageBadge({ storage, itemCount, found, pos, onClick, onMoveStart }: Props) {
+export function StorageBadge({ storage, itemCount, found, selected, pos, onClick, onMoveStart }: Props) {
   const meta = STORAGE_TYPES.find((s) => s.type === storage.type)
   const p = pos ?? storage
   return (
     <button
       type="button"
-      className={`storage${found ? ' found' : ''}`}
+      className={`storage${found ? ' found' : ''}${selected ? ' selected' : ''}`}
       style={{ left: p.x, top: p.y }}
       // 수납장 모드에서만 드래그=이동. stopPropagation으로 지도 배치/생성 드래그와 안 겹치게.
       onPointerDown={onMoveStart ? (e) => { e.stopPropagation(); onMoveStart(storage, e) } : undefined}

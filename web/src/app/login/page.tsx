@@ -70,7 +70,7 @@ export default function LoginPage() {
     >
       <div style={{ fontSize: '40px' }}>🔍🏠</div>
       <h1 style={{ fontSize: '24px', margin: 0 }}>홈즈맵</h1>
-      <p style={{ color: '#666', margin: '0 0 12px' }}>우리집 물건 지도</p>
+      <p style={{ color: 'var(--ink-soft)', margin: '0 0 12px' }}>우리집 물건 지도</p>
 
       {status === 'sent' ? (
         <p>메일로 로그인 링크를 보냈어요. 확인해주세요.</p>
@@ -98,9 +98,9 @@ export default function LoginPage() {
         </form>
       )}
 
-      {errorMsg && <p style={{ color: '#c00', margin: 0 }}>{errorMsg}</p>}
+      {errorMsg && <p style={{ color: 'var(--danger)', margin: 0 }}>{errorMsg}</p>}
 
-      <div style={{ width: '100%', borderTop: '1px solid #ddd', margin: '12px 0' }} />
+      <div style={{ width: '100%', borderTop: '1px solid var(--line)', margin: '12px 0' }} />
 
       <button
         type="button"

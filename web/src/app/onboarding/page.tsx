@@ -56,7 +56,7 @@ export default function OnboardingPage() {
     >
       <div style={{ fontSize: '40px' }}>🔍🏠</div>
       <h1 style={{ fontSize: '22px', margin: 0 }}>새 가족 만들기</h1>
-      <p style={{ color: '#666', margin: '0 0 12px', fontSize: '14px' }}>
+      <p style={{ color: 'var(--ink-soft)', margin: '0 0 12px', fontSize: '14px' }}>
         초대받으셨나요? 문자나 카톡으로 받은 초대 링크를 눌러 참여해주세요.
       </p>
 
@@ -101,7 +101,7 @@ export default function OnboardingPage() {
         </button>
       </form>
 
-      {errorMsg && <p style={{ color: '#c00', margin: 0 }}>{errorMsg}</p>}
+      {errorMsg && <p style={{ color: 'var(--danger)', margin: 0 }}>{errorMsg}</p>}
 
       {recoveryCode && (
         <div
@@ -119,7 +119,7 @@ export default function OnboardingPage() {
         >
           <div
             style={{
-              background: '#fff',
+              background: 'var(--surface)',
               borderRadius: '8px',
               padding: '24px',
               maxWidth: '360px',
@@ -136,7 +136,7 @@ export default function OnboardingPage() {
                 fontFamily: 'monospace',
                 fontSize: '15px',
                 wordBreak: 'break-all',
-                background: '#f3f3f3',
+                background: 'var(--bg)',
                 padding: '12px',
                 borderRadius: '4px',
                 margin: 0,
@@ -147,7 +147,7 @@ export default function OnboardingPage() {
             <button type="button" onClick={handleCopy} style={{ padding: '10px', fontSize: '16px' }}>
               {copied ? '복사됨' : '복사'}
             </button>
-            <p style={{ color: '#c00', fontSize: '13px', margin: 0 }}>
+            <p style={{ color: 'var(--danger)', fontSize: '13px', margin: 0 }}>
               이 코드를 안전한 곳에 보관하세요. 가족 전원이 잠금 암호를 잊으면 이 코드로만 복구할 수 있어요.
             </p>
             <button

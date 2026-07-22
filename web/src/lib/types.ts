@@ -24,7 +24,8 @@ export type DecItem = Omit<Item, 'enc_name' | 'enc_memo'> & { name: string; memo
 export type ItemDraft = { name: string; memo: string; photoFile?: File }
 export type Activity = { id: UUID; family_id: UUID; actor_id: UUID; kind: string; enc_payload: string; created_at: string }
 
-export type Mode = 'select' | 'room' | 'storage'
+// 기본은 'none'(직접조작: 탭=선택/열기, 드래그=이동). add-*는 1회성 생성 액션으로, 완료하면 스스로 none으로 돌아온다.
+export type Tool = 'none' | 'add-room' | 'add-storage'
 
 export type StorageTypeKey = 'drawer' | 'closet' | 'shelf' | 'fridge' | 'box' | 'shoe'
 export const STORAGE_TYPES: { type: StorageTypeKey; em: string; label: string }[] = [
@@ -32,10 +33,12 @@ export const STORAGE_TYPES: { type: StorageTypeKey; em: string; label: string }[
   { type: 'shelf',  em: '📚', label: '선반' },   { type: 'fridge', em: '🧊', label: '냉장고' },
   { type: 'box',    em: '📦', label: '수납박스' }, { type: 'shoe',  em: '👟', label: '신발장' },
 ]
+// Clay 브랜드 팔레트(피치·라벤더·민트·오커·코랄). 반투명 fill이라 라이트/다크 양쪽에서 tint로 동작,
+// border는 라벨 텍스트에도 쓰이므로 두 배경 모두에서 읽히는 중간 채도.
 export const ROOM_COLORS = [
-  { fill: 'rgba(122,168,116,.16)', border: '#7aa874', name: '초록' },
-  { fill: 'rgba(107,142,181,.16)', border: '#6b8eb5', name: '파랑' },
-  { fill: 'rgba(224,158,84,.18)',  border: '#d99a50', name: '주황' },
-  { fill: 'rgba(186,124,168,.16)', border: '#ba7ca8', name: '분홍' },
-  { fill: 'rgba(153,143,101,.18)', border: '#a79a63', name: '카키' },
+  { fill: 'rgba(255,176,132,.22)', border: '#e08a52', name: '피치' },
+  { fill: 'rgba(184,164,237,.22)', border: '#8f77d8', name: '라벤더' },
+  { fill: 'rgba(164,212,197,.24)', border: '#5aa88f', name: '민트' },
+  { fill: 'rgba(232,185,74,.22)',  border: '#c99a27', name: '오커' },
+  { fill: 'rgba(255,107,90,.18)',  border: '#e0553f', name: '코랄' },
 ]

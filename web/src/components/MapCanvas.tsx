@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import type { Room, Storage, DecItem, Mode, StorageTypeKey } from '@/lib/types'
-import { STORAGE_TYPES } from '@/lib/types'
+import type { Room, Storage, DecItem, Tool } from '@/lib/types'
 import {
   fitScale, LOGICAL_W, LOGICAL_H, MIN_ROOM_W, MIN_ROOM_H,
   normalizeRect, pointInRect, moveRoomRect, resizeRoomRect, clampStoragePos, recomputeChildStorages,
@@ -10,28 +9,23 @@ import {
 import type { Pt, Rect } from '@/lib/geometry'
 import { RoomShape } from './RoomShape'
 import { StorageBadge } from './StorageBadge'
-import { Modal } from './Modal'
 
 type Props = {
-  mode: Mode
-  palType: StorageTypeKey
+  tool: Tool
   rooms: Room[]
   storages: Storage[]
   decItems: DecItem[]
-  onStorageClick?: (storageId: string) => void
-  onRoomCreate: (rect: Rect, name: string, colorIndex: number) => void
-  onStoragePlace: (room: Room, point: Pt, name: string) => void
-  onRoomDelete: (room: Room) => void
+  selectedRoomId?: string | null
+  selectedStorageId?: string | null
+  onStorageClick: (storageId: string) => void
+  onRoomSelect: (roomId: string | null) => void
+  onRoomCreate: (rect: Rect) => void
+  onStoragePlace: (room: Room, point: Pt) => void
   onRoomGeometry: (room: Room, next: Rect) => void
   onStorageMove: (storage: Storage, pos: Pt) => void
   onToast: (msg: string) => void
   flashStorageId?: string | null
 }
-
-type PendingModal =
-  | { kind: 'room'; rect: Rect }
-  | { kind: 'storage'; room: Room; point: Pt }
-  | { kind: 'delete'; room: Room }
 
 // 드래그 상태 머신: 생성/방이동/방리사이즈/수납장이동이 pointermove·pointerup 생명주기를 공유한다.
 // 프리뷰(rect/pos)는 드래그 중 로컬 state로만 갱신하고, 손 뗄 때 딱 한 번 부모로 커밋한다(스토어는 드래그 중 미변경).
@@ -42,15 +36,16 @@ type Drag =
   | { kind: 'move-storage'; storage: Storage; room: Room; grab: Pt; pos: Pt }
 
 export function MapCanvas({
-  mode,
-  palType,
+  tool,
   rooms,
   storages,
   decItems,
+  selectedRoomId,
+  selectedStorageId,
   onStorageClick,
+  onRoomSelect,
   onRoomCreate,
   onStoragePlace,
-  onRoomDelete,
   onRoomGeometry,
   onStorageMove,
   onToast,
@@ -60,7 +55,6 @@ export function MapCanvas({
   const mapRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(1)
   const [drag, setDrag] = useState<Drag | null>(null)
-  const [pendingModal, setPendingModal] = useState<PendingModal | null>(null)
 
   useEffect(() => {
     const el = scrollRef.current
@@ -73,7 +67,6 @@ export function MapCanvas({
   }, [])
 
   // 검색 결과 클릭(flashStorageId 변경) 시 해당 수납장으로 스크롤(프로토타입 flashStorage 이식).
-  // glow/found 클래스는 아래 렌더에서 props로 결정되므로, 여기서는 스크롤이라는 부수효과만 담당한다.
   useEffect(() => {
     if (!flashStorageId) return
     const el = mapRef.current?.querySelector<HTMLElement>('.storage.found')
@@ -81,18 +74,20 @@ export function MapCanvas({
   }, [flashStorageId])
 
   // 지도는 transform:scale() 로 시각적으로만 축소되므로, 화면 좌표를 940x600 논리 좌표로 되돌리려면
-  // 클릭 지점과 지도 원점의 차를 scale로 나눠야 한다(프로토타입은 scale이 항상 1이라 나눗셈이 없었음).
+  // 클릭 지점과 지도 원점의 차를 scale로 나눠야 한다.
   function mapPos(e: { clientX: number; clientY: number }): Pt {
     const rect = mapRef.current!.getBoundingClientRect()
     return { x: Math.round((e.clientX - rect.left) / scale), y: Math.round((e.clientY - rect.top) / scale) }
   }
 
-  // 빈 캔버스에서 시작한 pointerdown만 여기 도달(방/수납장/그립은 각 요소가 stopPropagation) → 새 방 생성 드래그.
+  // 빈 캔버스에서 시작한 pointerdown만 여기 도달(방/수납장/그립은 각 요소가 stopPropagation) → '방 추가' 시 생성 드래그.
   function handleMapPointerDown(e: React.PointerEvent) {
-    if (mode !== 'room') return
+    if (tool !== 'add-room') return
     const p = mapPos(e)
     setDrag({ kind: 'create', start: p, rect: { x: p.x, y: p.y, w: 0, h: 0 } })
   }
+
+  const selectRoom = (room: Room) => onRoomSelect(room.id)
 
   function startRoomMove(room: Room, e: React.PointerEvent) {
     const p = mapPos(e)
@@ -129,7 +124,7 @@ export function MapCanvas({
         if (rect.w < MIN_ROOM_W || rect.h < MIN_ROOM_H) {
           if (rect.w > 8 || rect.h > 8) onToast('조금 더 크게 드래그해주세요')
         } else {
-          setPendingModal({ kind: 'room', rect })
+          onRoomCreate(rect)
         }
       } else if (active.kind === 'move-room' || active.kind === 'resize-room') {
         const next = active.kind === 'move-room' ? moveRoomRect(active.room, p, active.grab) : resizeRoomRect(active.room, p)
@@ -154,14 +149,15 @@ export function MapCanvas({
   }, [drag?.kind])
 
   function handleClick(e: React.MouseEvent) {
-    if (mode !== 'storage') return
     const p = mapPos(e)
-    const room = rooms.find((r) => pointInRect(p, r))
-    if (!room) {
-      onToast('방 안쪽을 클릭해서 배치해주세요')
-      return
+    if (tool === 'add-storage') {
+      const room = rooms.find((r) => pointInRect(p, r))
+      if (!room) { onToast('방 안쪽을 탭해서 놓아주세요'); return }
+      onStoragePlace(room, p)
+    } else if (tool === 'none') {
+      // 배경(빈 캔버스) 탭 — 방/수납장은 stopPropagation이라 여기 안 옴 → 선택 해제(드로어 닫힘)
+      onRoomSelect(null)
     }
-    setPendingModal({ kind: 'storage', room, point: p })
   }
 
   const itemCountByStorage = new Map<string, number>()
@@ -170,12 +166,11 @@ export function MapCanvas({
   }
 
   const flashRoomId = flashStorageId ? storages.find((s) => s.id === flashStorageId)?.room_id : undefined
-  const palMeta = STORAGE_TYPES.find((s) => s.type === palType)!
   const mapClassName = [
     'map',
     rooms.length === 0 ? 'empty' : '',
-    mode === 'room' ? 'mode-room' : '',
-    mode === 'storage' ? 'mode-storage' : '',
+    tool === 'add-room' ? 'tool-add-room' : '',
+    tool === 'add-storage' ? 'tool-add-storage' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -209,9 +204,10 @@ export function MapCanvas({
                 room={room}
                 rect={previewRect && drag && 'room' in drag && drag.room.id === room.id ? previewRect : undefined}
                 glow={room.id === flashRoomId}
-                onDelete={(r) => setPendingModal({ kind: 'delete', room: r })}
-                onMoveStart={mode === 'room' ? startRoomMove : undefined}
-                onResizeStart={mode === 'room' ? startRoomResize : undefined}
+                selected={room.id === selectedRoomId}
+                onSelect={tool === 'none' ? selectRoom : undefined}
+                onMoveStart={tool === 'none' ? startRoomMove : undefined}
+                onResizeStart={tool === 'none' && room.id === selectedRoomId ? startRoomResize : undefined}
               />
             ))}
             {storages.map((storage) => (
@@ -221,8 +217,9 @@ export function MapCanvas({
                 pos={storageOverride.get(storage.id)}
                 itemCount={itemCountByStorage.get(storage.id) ?? 0}
                 found={storage.id === flashStorageId}
-                onClick={mode === 'select' ? onStorageClick : undefined}
-                onMoveStart={mode === 'storage' ? startStorageMove : undefined}
+                selected={storage.id === selectedStorageId}
+                onClick={tool === 'none' ? onStorageClick : undefined}
+                onMoveStart={tool === 'none' ? startStorageMove : undefined}
               />
             ))}
             {drag?.kind === 'create' && (
@@ -239,47 +236,6 @@ export function MapCanvas({
           🏠 방 {rooms.length} · 📦 수납장 {storages.length} · 🧸 물건 {decItems.length}개 등록됨
         </span>
       </div>
-
-      {pendingModal && pendingModal.kind === 'room' && (
-        <Modal
-          title="✏️ 새 방 만들기"
-          nameLabel="방 이름"
-          namePlaceholder="예: 거실, 아이방"
-          showColorPicker
-          okText="방 만들기"
-          onCancel={() => setPendingModal(null)}
-          onConfirm={({ name, colorIndex }) => {
-            setPendingModal(null)
-            onRoomCreate(pendingModal.rect, name, colorIndex)
-          }}
-        />
-      )}
-      {pendingModal && pendingModal.kind === 'storage' && (
-        <Modal
-          title={`${palMeta.em} ${pendingModal.room.name}에 ${palMeta.label} 놓기`}
-          nameLabel="수납장 이름"
-          namePlaceholder={`예: ${pendingModal.room.name} ${palMeta.label}`}
-          defaultName={`${pendingModal.room.name} ${palMeta.label}`}
-          okText="배치하기"
-          onCancel={() => setPendingModal(null)}
-          onConfirm={({ name }) => {
-            setPendingModal(null)
-            onStoragePlace(pendingModal.room, pendingModal.point, name)
-          }}
-        />
-      )}
-      {pendingModal && pendingModal.kind === 'delete' && (
-        <Modal
-          title="방 삭제"
-          message={`'${pendingModal.room.name}' 방과 그 안의 수납장·물건이 함께 삭제됩니다`}
-          okText="삭제"
-          onCancel={() => setPendingModal(null)}
-          onConfirm={() => {
-            setPendingModal(null)
-            onRoomDelete(pendingModal.room)
-          }}
-        />
-      )}
     </div>
   )
 }

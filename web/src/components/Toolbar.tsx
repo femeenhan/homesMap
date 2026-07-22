@@ -1,45 +1,45 @@
-import type { Activity, FamilyMember, Mode, StorageTypeKey } from '@/lib/types'
+import type { Activity, FamilyMember, Tool, StorageTypeKey } from '@/lib/types'
 import { STORAGE_TYPES } from '@/lib/types'
 import { ActivityFeed } from './ActivityFeed'
 
-const HINTS: Record<Mode, string> = {
-  select: '👆 수납장을 클릭하면 그 안의 물건을 보고 등록할 수 있어요. 위쪽 검색창에서 물건을 바로 찾아보세요.',
-  room: '✏️ 맵 위에서 드래그하면 방이 그려져요. 그린 뒤 이름과 색을 정해주세요.',
-  storage: '📦 아래에서 수납장 종류를 고른 뒤, 방 안쪽을 클릭해서 배치하세요.',
+const HINTS: Record<Tool, string> = {
+  none: '👆 수납장을 탭하면 물건을 보고 등록해요. 방을 탭하면 이름·색을 바꿀 수 있어요. 위 검색창에서 물건을 바로 찾아보세요.',
+  'add-room': '✏️ 맵에서 드래그해 방을 그리세요. 그리면 바로 이름을 정할 수 있어요.',
+  'add-storage': '📦 종류를 고른 뒤, 방 안쪽을 탭해서 수납장을 놓으세요.',
 }
 
-const MODE_BUTTONS: { mode: Mode; em: string; label: string }[] = [
-  { mode: 'select', em: '👆', label: '둘러보기' },
-  { mode: 'room', em: '✏️', label: '방 그리기' },
-  { mode: 'storage', em: '📦', label: '수납장 놓기' },
+// 1회성 생성 액션. 다시 누르면 취소(none). 완료하면 각 핸들러가 자동으로 none으로 되돌린다.
+const ACTIONS: { tool: Exclude<Tool, 'none'>; em: string; label: string }[] = [
+  { tool: 'add-room', em: '✏️', label: '방 추가' },
+  { tool: 'add-storage', em: '📦', label: '수납장 추가' },
 ]
 
 type Props = {
-  mode: Mode
-  onModeChange: (mode: Mode) => void
+  tool: Tool
+  onToolChange: (tool: Tool) => void
   palType: StorageTypeKey
   onPalTypeChange: (type: StorageTypeKey) => void
   activity: Activity[]
   members: FamilyMember[]
 }
 
-export function Toolbar({ mode, onModeChange, palType, onPalTypeChange, activity, members }: Props) {
+export function Toolbar({ tool, onToolChange, palType, onPalTypeChange, activity, members }: Props) {
   return (
     <aside className="toolbar">
       <div>
         <div className="tb-title">만들기 도구</div>
-        {MODE_BUTTONS.map((b) => (
+        {ACTIONS.map((b) => (
           <button
-            key={b.mode}
+            key={b.tool}
             type="button"
-            className={`mode-btn${mode === b.mode ? ' active' : ''}`}
-            onClick={() => onModeChange(b.mode)}
+            className={`mode-btn${tool === b.tool ? ' active' : ''}`}
+            onClick={() => onToolChange(tool === b.tool ? 'none' : b.tool)}
           >
             <span className="em">{b.em}</span>
             {b.label}
           </button>
         ))}
-        <div className={`storage-palette${mode === 'storage' ? ' open' : ''}`}>
+        <div className={`storage-palette${tool === 'add-storage' ? ' open' : ''}`}>
           {STORAGE_TYPES.map((s) => (
             <button
               key={s.type}
@@ -53,7 +53,7 @@ export function Toolbar({ mode, onModeChange, palType, onPalTypeChange, activity
           ))}
         </div>
       </div>
-      <div className="hint">{HINTS[mode]}</div>
+      <div className="hint">{HINTS[tool]}</div>
       <ActivityFeed activity={activity} members={members} />
     </aside>
   )

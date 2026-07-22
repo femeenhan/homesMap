@@ -12,7 +12,9 @@ import { Header } from '@/components/Header'
 import { Toolbar } from '@/components/Toolbar'
 import { MapCanvas } from '@/components/MapCanvas'
 import { DetailPanel } from '@/components/DetailPanel'
-import type { Room, Storage, Item, DecItem, FamilyMember, Mode, StorageTypeKey, Activity, ItemDraft } from '@/lib/types'
+import { RoomDetail } from '@/components/RoomDetail'
+import type { Room, Storage, Item, DecItem, FamilyMember, Tool, StorageTypeKey, Activity, ItemDraft } from '@/lib/types'
+import { STORAGE_TYPES } from '@/lib/types'
 import { recomputeChildStorages } from '@/lib/geometry'
 import type { Pt, Rect } from '@/lib/geometry'
 
@@ -32,17 +34,28 @@ export default function AppHomePage() {
   const router = useRouter()
   const [data, setData] = useState<BootData | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [mode, setMode] = useState<Mode>('select')
+  const [tool, setTool] = useState<Tool>('none')
   const [palType, setPalType] = useState<StorageTypeKey>('drawer')
+  // 선택은 수납장/방 중 하나만 — 물건 드로어와 방 드로어가 배타적으로 열린다.
   const [selectedStorageId, setSelectedStorageId] = useState<string | null>(null)
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
   const [flashStorageId, setFlashStorageId] = useState<string | null>(null)
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { message: toastMsg, showToast } = useToast()
 
-  // 검색 결과 클릭: 둘러보기 모드로 전환 + 패널 열기 + 지도에 4초간 flash(프로토타입 flashStorage 이식)
-  function handleSearchPick(storageId: string) {
-    setMode('select')
+  function selectStorage(storageId: string | null) {
     setSelectedStorageId(storageId)
+    setSelectedRoomId(null)
+  }
+  function selectRoom(roomId: string | null) {
+    setSelectedRoomId(roomId)
+    setSelectedStorageId(null)
+  }
+
+  // 검색 결과 클릭: 기본 상태로 전환 + 물건 드로어 열기 + 지도에 4초간 flash(프로토타입 flashStorage 이식)
+  function handleSearchPick(storageId: string) {
+    setTool('none')
+    selectStorage(storageId)
     setFlashStorageId(storageId)
     if (flashTimerRef.current) clearTimeout(flashTimerRef.current)
     flashTimerRef.current = setTimeout(() => setFlashStorageId(null), 4000)
@@ -211,33 +224,38 @@ export default function AppHomePage() {
   // ---------- 지도 편집: 방 그리기 / 수납장 놓기 / 방 삭제(연쇄 소프트삭제) ----------
   // 셋 다 같은 패턴: 로컬에 즉시 반영(로컬 우선) → 낙관적 화면 갱신 → push() 시도(오프라인이면 토스트만)
 
-  async function handleRoomCreate(rect: Rect, name: string, colorIndex: number) {
+  // 방 생성(1회성): 기본 이름·자동 색으로 즉시 만들고 → 방 드로어를 열어(선택) 이름·색을 정하게 → 기본 상태 복귀.
+  // 중앙 모달 없이 그린 방이 맵에 남는다.
+  async function handleRoomCreate(rect: Rect) {
     if (!data) return
     const row: Room = {
       id: crypto.randomUUID(),
       family_id: data.familyId,
-      name,
+      name: '새 방',
       x: Math.round(rect.x),
       y: Math.round(rect.y),
       w: Math.round(rect.w),
       h: Math.round(rect.h),
-      color_index: colorIndex,
+      color_index: data.rooms.length % 5, // 인접 방과 색이 겹치지 않게 순환(ROOM_COLORS 5색)
       updated_at: new Date().toISOString(),
       deleted_at: null,
     }
     await store.putLocal('rooms', row, { dirty: true })
     setData((d) => d && { ...d, rooms: [...d.rooms, row] })
-    setMode('storage')
+    selectRoom(row.id)
+    setTool('none')
     try {
       await push()
-      showToast(`'${name}' 방이 생겼어요! 이제 수납장을 놓아보세요`)
     } catch {
       showToast('오프라인 — 나중에 동기화됩니다')
     }
   }
 
-  async function handleStoragePlace(room: Room, point: Pt, name: string) {
+  // 수납장 배치(1회성): 선택된 종류·기본 이름으로 놓고 → 물건 드로어를 바로 열어(선택) 물건을 등록하게 → 기본 상태 복귀.
+  async function handleStoragePlace(room: Room, point: Pt) {
     if (!data) return
+    const label = STORAGE_TYPES.find((s) => s.type === palType)?.label ?? '수납장'
+    const name = `${room.name} ${label}`
     const row: Storage = {
       id: crypto.randomUUID(),
       family_id: data.familyId,
@@ -251,6 +269,8 @@ export default function AppHomePage() {
     }
     await store.putLocal('storages', row, { dirty: true })
     setData((d) => d && { ...d, storages: [...d.storages, row] })
+    selectStorage(row.id)
+    setTool('none')
     try {
       await push()
     } catch {
@@ -258,6 +278,29 @@ export default function AppHomePage() {
     }
     // 활동 기록은 최선노력(best-effort) — 실패(오프라인 등)해도 조용히 무시, UI를 막지 않음
     void recordActivity(data.familyId, data.userId, 'storage_added', { roomName: room.name, storageName: name })
+  }
+
+  // 방 추가 버튼(방 드로어): 그 방 중앙에 기본 종류로 놓고 물건 드로어를 연다(handleStoragePlace 재사용).
+  function handleAddStorageToRoom(room: Room) {
+    void handleStoragePlace(room, { x: room.x + room.w / 2, y: room.y + room.h / 2 })
+  }
+
+  // 드로어에서 방 이름/색 편집
+  async function handleRoomUpdateMeta(room: Room, patch: { name?: string; color_index?: number }) {
+    if (!data) return
+    const updated: Room = { ...room, ...patch, updated_at: new Date().toISOString() }
+    await store.putLocal('rooms', updated, { dirty: true })
+    setData((d) => d && { ...d, rooms: d.rooms.map((r) => (r.id === room.id ? updated : r)) })
+    try { await push() } catch { showToast('오프라인 — 나중에 동기화됩니다') }
+  }
+
+  // 드로어에서 수납장 이름 편집
+  async function handleStorageRename(storage: Storage, name: string) {
+    if (!data) return
+    const updated: Storage = { ...storage, name, updated_at: new Date().toISOString() }
+    await store.putLocal('storages', updated, { dirty: true })
+    setData((d) => d && { ...d, storages: d.storages.map((s) => (s.id === storage.id ? updated : s)) })
+    try { await push() } catch { showToast('오프라인 — 나중에 동기화됩니다') }
   }
 
   // 방 이동/리사이즈 커밋: 방 지오메트리 갱신 + 자식 수납장 재계산(이동은 함께, 리사이즈는 밖으로 나간 것만 안으로).
@@ -346,6 +389,7 @@ export default function AppHomePage() {
     await Promise.all(updatedStorages.map((s) => store.putLocal('storages', s, { dirty: true })))
     await Promise.all(updatedItems.map((it) => store.putLocal('items', it, { dirty: true })))
 
+    setSelectedRoomId(null) // 삭제한 방의 드로어 닫기
     setData((d) => d && {
       ...d,
       rooms: d.rooms.filter((r) => r.id !== room.id),
@@ -511,8 +555,10 @@ export default function AppHomePage() {
   if (!data) return null
 
   const selectedStorage = data.storages.find((s) => s.id === selectedStorageId)
-  const selectedRoom = selectedStorage ? data.rooms.find((r) => r.id === selectedStorage.room_id) : undefined
+  const storageRoom = selectedStorage ? data.rooms.find((r) => r.id === selectedStorage.room_id) : undefined
   const selectedItems = selectedStorage ? data.decItems.filter((it) => it.storage_id === selectedStorage.id) : []
+  const selectedRoom = data.rooms.find((r) => r.id === selectedRoomId)
+  const selectedRoomStorageCount = selectedRoom ? data.storages.filter((s) => s.room_id === selectedRoom.id).length : 0
 
   return (
     <>
@@ -531,23 +577,24 @@ export default function AppHomePage() {
       )}
       <div className="main">
         <Toolbar
-          mode={mode}
-          onModeChange={setMode}
+          tool={tool}
+          onToolChange={setTool}
           palType={palType}
           onPalTypeChange={setPalType}
           activity={data.activity}
           members={data.members}
         />
         <MapCanvas
-          mode={mode}
-          palType={palType}
+          tool={tool}
           rooms={data.rooms}
           storages={data.storages}
           decItems={data.decItems}
-          onStorageClick={setSelectedStorageId}
+          selectedRoomId={selectedRoomId}
+          selectedStorageId={selectedStorageId}
+          onStorageClick={selectStorage}
+          onRoomSelect={selectRoom}
           onRoomCreate={handleRoomCreate}
           onStoragePlace={handleStoragePlace}
-          onRoomDelete={handleRoomDelete}
           onRoomGeometry={handleRoomGeometry}
           onStorageMove={handleStorageMove}
           onToast={showToast}
@@ -557,13 +604,26 @@ export default function AppHomePage() {
           <DetailPanel
             key={selectedStorage.id}
             storage={selectedStorage}
-            room={selectedRoom}
+            room={storageRoom}
             items={selectedItems}
             members={data.members}
-            onClose={() => setSelectedStorageId(null)}
-            onItemsAdd={(drafts) => handleItemsAdd(selectedStorage, selectedRoom, drafts)}
+            onClose={() => selectStorage(null)}
+            onRename={(name) => handleStorageRename(selectedStorage, name)}
+            onItemsAdd={(drafts) => handleItemsAdd(selectedStorage, storageRoom, drafts)}
             onItemDelete={handleItemDelete}
             onStorageDelete={handleStorageDelete}
+          />
+        )}
+        {selectedRoom && (
+          <RoomDetail
+            key={selectedRoom.id}
+            room={selectedRoom}
+            storageCount={selectedRoomStorageCount}
+            onClose={() => selectRoom(null)}
+            onRename={(name) => handleRoomUpdateMeta(selectedRoom, { name })}
+            onColorChange={(i) => handleRoomUpdateMeta(selectedRoom, { color_index: i })}
+            onAddStorage={handleAddStorageToRoom}
+            onDelete={handleRoomDelete}
           />
         )}
       </div>

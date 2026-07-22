@@ -91,7 +91,7 @@ export default function InvitePage() {
       {phase === 'invalid' && (
         <>
           <h1 style={{ fontSize: '20px', margin: 0 }}>초대 링크가 올바르지 않아요</h1>
-          <p style={{ color: '#666', fontSize: '14px' }}>
+          <p style={{ color: 'var(--ink-soft)', fontSize: '14px' }}>
             링크를 보낸 가족 구성원에게 새 초대 링크를 다시 받아주세요.
           </p>
         </>
@@ -102,7 +102,7 @@ export default function InvitePage() {
       {phase === 'family-error' && (
         <>
           <h1 style={{ fontSize: '20px', margin: 0 }}>초대 링크가 유효하지 않거나 만료됐어요</h1>
-          <p style={{ color: '#666', fontSize: '14px' }}>
+          <p style={{ color: 'var(--ink-soft)', fontSize: '14px' }}>
             링크를 보낸 가족 구성원에게 새 초대 링크를 다시 받아주세요.
           </p>
         </>
@@ -111,7 +111,7 @@ export default function InvitePage() {
       {phase === 'boot-error' && (
         <>
           <h1 style={{ fontSize: '20px', margin: 0 }}>연결에 문제가 있어요</h1>
-          <p style={{ color: '#666', fontSize: '14px' }}>새로고침 해주세요.</p>
+          <p style={{ color: 'var(--ink-soft)', fontSize: '14px' }}>새로고침 해주세요.</p>
           <button
             type="button"
             onClick={() => location.reload()}
@@ -158,7 +158,7 @@ export default function InvitePage() {
             </button>
           </form>
 
-          {errorMsg && <p style={{ color: '#c00', margin: 0 }}>{errorMsg}</p>}
+          {errorMsg && <p style={{ color: 'var(--danger)', margin: 0 }}>{errorMsg}</p>}
         </>
       )}
     </div>
