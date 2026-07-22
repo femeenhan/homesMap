@@ -44,7 +44,7 @@ function TreeRoom({ room, ...p }: { room: Room } & Props) {
   const storages = p.storages.filter((s) => s.room_id === room.id)
   return (
     <div className="tree-room">
-      <div className="tree-row room">
+      <div className="tree-row">
         <button type="button" className="cmp-twist" onClick={() => setExpanded((e) => !e)} aria-label={expanded ? '접기' : '펼치기'}>
           {expanded ? '▾' : '▸'}
         </button>
@@ -76,7 +76,7 @@ function TreeStorage({ storage, ...p }: { storage: Storage; room: Room } & Props
   const items = p.decItems.filter((it) => it.storage_id === storage.id)
   return (
     <div className="tree-storage">
-      <div className="tree-row storage" style={{ paddingLeft: 14 }}>
+      <div className="tree-row" style={{ paddingLeft: 14 }}>
         <button type="button" className="cmp-twist" onClick={() => setExpanded((e) => !e)} aria-label={expanded ? '접기' : '펼치기'}>
           {expanded ? '▾' : '▸'}
         </button>
