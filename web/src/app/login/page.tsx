@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 type Status = 'idle' | 'sending' | 'sent' | 'error'
@@ -9,6 +9,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState<Status>('idle')
   const [errorMsg, setErrorMsg] = useState('')
+
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('error') === 'auth') {
+      setErrorMsg('로그인 링크가 만료되었거나 이미 사용되었어요. 다시 시도해주세요.')
+    }
+  }, [])
 
   async function handleEmailLogin(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -74,6 +80,7 @@ export default function LoginPage() {
           <input
             type="email"
             required
+            aria-label="이메일 주소"
             placeholder="이메일 주소"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
