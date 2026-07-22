@@ -2,37 +2,22 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  })
-
+  let response = NextResponse.next({ request })
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll: () => {
-          return request.cookies.getAll().map((c) => ({
-            name: c.name,
-            value: c.value,
-          }))
-        },
-        setAll: (cookiesToSet, headers) => {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          )
-          Object.entries(headers).forEach(([key, value]) =>
-            response.headers.set(key, value)
-          )
+        getAll: () => request.cookies.getAll(),
+        setAll: (toSet) => {
+          toSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          response = NextResponse.next({ request })
+          toSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
         },
       },
     }
   )
-
   await supabase.auth.getUser()
-
   return response
 }
 
