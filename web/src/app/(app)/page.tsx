@@ -18,6 +18,7 @@ type BootData = {
   decItems: DecItem[]
   members: FamilyMember[]
   offline: boolean
+  skippedCount: number
 }
 
 export default function AppHomePage() {
@@ -97,17 +98,24 @@ export default function AppHomePage() {
       store.allActive<Item>('items'),
       store.getAll<FamilyMember>('members'),
     ])
-    const decItems: DecItem[] = await Promise.all(
-      items.map(async (it) => {
+    // 손상된 블롭/키 불일치 등으로 한 물건의 복호화가 실패해도 나머지 지도는 정상 렌더 — 실패한 항목만 건너뜀
+    const decrypted = await Promise.all(
+      items.map(async (it): Promise<DecItem | null> => {
         const { enc_name, enc_memo, ...rest } = it
-        return {
-          ...rest,
-          name: await decryptField(fdk, enc_name),
-          memo: enc_memo ? await decryptField(fdk, enc_memo) : '',
+        try {
+          return {
+            ...rest,
+            name: await decryptField(fdk, enc_name),
+            memo: enc_memo ? await decryptField(fdk, enc_memo) : '',
+          }
+        } catch {
+          return null
         }
       })
     )
-    setData({ familyId, rooms, storages, decItems, members, offline })
+    const decItems = decrypted.filter((d): d is DecItem => d !== null)
+    const skippedCount = decrypted.length - decItems.length
+    setData({ familyId, rooms, storages, decItems, members, offline, skippedCount })
   }
 
   // 앱으로 포커스가 돌아올 때 백그라운드로 재동기화(로컬 우선 — 실패해도 화면은 그대로 유지)
@@ -147,6 +155,9 @@ export default function AppHomePage() {
     <>
       <Header familyId={data.familyId} members={data.members} />
       {data.offline && <div className="offline-notice">오프라인 — 저장된 데이터로 표시 중</div>}
+      {data.skippedCount > 0 && (
+        <div className="offline-notice">일부 물건({data.skippedCount}개)을 해독하지 못해 표시하지 않았어요.</div>
+      )}
       <div className="main">
         <MapCanvas rooms={data.rooms} storages={data.storages} decItems={data.decItems} />
       </div>
