@@ -66,6 +66,20 @@ export function DetailPanel({ storage, room, items, members, onClose, onItemsAdd
   // 언마운트(패널 닫힘 또는 다른 수납장 선택으로 key 변경) 시 만든 objectURL 전부 해제
   useEffect(() => () => { objectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u)) }, [])
 
+  // 패널이 열린 채로 물건이 삭제되면(언마운트 전) 그 항목의 objectURL/캐시를 즉시 정리
+  function handleItemDelete(item: DecItem) {
+    const url = photoUrls[item.id]
+    if (url) {
+      URL.revokeObjectURL(url)
+      objectUrlsRef.current = objectUrlsRef.current.filter((u) => u !== url)
+      setPhotoUrls((m) => { const rest = { ...m }; delete rest[item.id]; return rest })
+    }
+    if (photoErrors[item.id]) {
+      setPhotoErrors((m) => { const rest = { ...m }; delete rest[item.id]; return rest })
+    }
+    onItemDelete(item)
+  }
+
   const canSubmit = name.trim().length > 0 && !submitting
 
   async function handleSubmit() {
@@ -120,7 +134,7 @@ export function DetailPanel({ storage, room, items, members, onClose, onItemsAdd
                   {it.memo && <div className="item-memo">{it.memo}</div>}
                   <div className="item-by">{by ? `${by.emoji} ${by.display_name} ` : ''}등록</div>
                 </div>
-                <button type="button" className="item-del" title="삭제" onClick={() => onItemDelete(it)}>
+                <button type="button" className="item-del" title="삭제" onClick={() => handleItemDelete(it)}>
                   🗑️
                 </button>
               </div>

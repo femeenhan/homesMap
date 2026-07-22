@@ -252,7 +252,8 @@ export default function AppHomePage() {
   // 사진 다운스케일/압축: 긴 변 최대 1280px로 canvas에 리드로우 후 JPEG 0.8 품질로 재인코딩.
   // 별도 라이브러리 없이 네이티브 canvas만 사용 — 원본을 그대로 암호화하면 업로드 용량이 커짐.
   async function downscaleImage(file: File): Promise<ArrayBuffer> {
-    const bitmap = await createImageBitmap(file)
+    // EXIF 회전 태그 반영 — 없으면 폰 카메라 사진(주 입력 경로)이 옆으로 누워 저장됨
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
     const maxEdge = 1280
     const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height))
     const w = Math.round(bitmap.width * scale)
