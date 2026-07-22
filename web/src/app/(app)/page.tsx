@@ -13,6 +13,7 @@ import { Toolbar } from '@/components/Toolbar'
 import { MapCanvas } from '@/components/MapCanvas'
 import { DetailPanel } from '@/components/DetailPanel'
 import type { Room, Storage, Item, DecItem, FamilyMember, Mode, StorageTypeKey, Activity, ItemDraft } from '@/lib/types'
+import { recomputeChildStorages } from '@/lib/geometry'
 import type { Pt, Rect } from '@/lib/geometry'
 
 type BootData = {
@@ -259,6 +260,50 @@ export default function AppHomePage() {
     void recordActivity(data.familyId, data.userId, 'storage_added', { roomName: room.name, storageName: name })
   }
 
+  // 방 이동/리사이즈 커밋: 방 지오메트리 갱신 + 자식 수납장 재계산(이동은 함께, 리사이즈는 밖으로 나간 것만 안으로).
+  // 실제로 위치가 바뀐 수납장만 dirty로 밀어 불필요한 push를 줄인다.
+  async function handleRoomGeometry(room: Room, next: Rect) {
+    if (!data) return
+    const now = new Date().toISOString()
+    const dx = next.x - room.x
+    const dy = next.y - room.y
+    const updatedRoom: Room = { ...room, x: next.x, y: next.y, w: next.w, h: next.h, updated_at: now }
+
+    const kids = data.storages.filter((s) => s.room_id === room.id)
+    const movedKids = recomputeChildStorages(kids, dx, dy, next)
+      .filter((s, i) => s.x !== kids[i].x || s.y !== kids[i].y)
+      .map((s) => ({ ...s, updated_at: now }))
+
+    await store.putLocal('rooms', updatedRoom, { dirty: true })
+    await Promise.all(movedKids.map((s) => store.putLocal('storages', s, { dirty: true })))
+
+    const movedById = new Map(movedKids.map((s) => [s.id, s]))
+    setData((d) => d && {
+      ...d,
+      rooms: d.rooms.map((r) => (r.id === room.id ? updatedRoom : r)),
+      storages: d.storages.map((s) => movedById.get(s.id) ?? s),
+    })
+
+    try {
+      await push()
+    } catch {
+      showToast('오프라인 — 나중에 동기화됩니다')
+    }
+  }
+
+  // 수납장 이동 커밋: 위치만 갱신(소속 방 안 클램프는 MapCanvas에서 이미 적용됨).
+  async function handleStorageMove(storage: Storage, pos: Pt) {
+    if (!data) return
+    const updated: Storage = { ...storage, x: pos.x, y: pos.y, updated_at: new Date().toISOString() }
+    await store.putLocal('storages', updated, { dirty: true })
+    setData((d) => d && { ...d, storages: d.storages.map((s) => (s.id === storage.id ? updated : s)) })
+    try {
+      await push()
+    } catch {
+      showToast('오프라인 — 나중에 동기화됩니다')
+    }
+  }
+
   // kind/payload를 일반화 — Task 10의 storage_added와 Task 11의 item_added가 이 한 경로를 공유
   async function recordActivity(familyId: string, actorId: string, kind: string, payload: Record<string, string>) {
     const fdk = keys.getFDK()
@@ -503,6 +548,8 @@ export default function AppHomePage() {
           onRoomCreate={handleRoomCreate}
           onStoragePlace={handleStoragePlace}
           onRoomDelete={handleRoomDelete}
+          onRoomGeometry={handleRoomGeometry}
+          onStorageMove={handleStorageMove}
           onToast={showToast}
           flashStorageId={flashStorageId}
         />

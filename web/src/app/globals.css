@@ -133,8 +133,11 @@ header{
   cursor:default; user-select:none;
   transform-origin:top left;
 }
-.map.mode-room{cursor:crosshair}
+.map.mode-room{cursor:crosshair;touch-action:none}       /* 방 모드: 생성/이동/리사이즈 드래그가 터치 스크롤에 안 뺏기게 */
 .map.mode-storage{cursor:copy}
+.map.mode-room .room{cursor:move}
+.map.mode-room .storage{pointer-events:none}             /* 방 모드에선 수납장이 밑의 방 잡기를 가로막지 않게 통과 */
+.map.mode-storage .storage{cursor:move;touch-action:none}
 .map.empty::after{
   content:"✏️  '방 그리기'를 누르고 드래그해서 첫 번째 방을 만들어보세요";
   position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
@@ -155,6 +158,10 @@ header{
 }
 .room:hover .room-del{display:flex}
 .room.glow{box-shadow:0 0 0 4px rgba(232,102,60,.35)}
+.room-grip{
+  position:absolute;right:-7px;bottom:-7px;width:16px;height:16px;border-radius:4px;z-index:6;
+  background:#fff;border:2px solid var(--accent);cursor:se-resize;touch-action:none;box-shadow:var(--shadow);
+}
 .ghost{
   position:absolute;border:2.5px dashed var(--accent);border-radius:10px;
   background:rgba(232,102,60,.08);pointer-events:none;display:none;
