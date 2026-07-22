@@ -6,10 +6,10 @@ const room = (id: string, name: string): Room => ({
   id, family_id: 'f1', name, x: 0, y: 0, w: 100, h: 100, color_index: 0, updated_at: '2026-01-01', deleted_at: null,
 })
 const storageRow = (id: string, roomId: string, name: string): Storage => ({
-  id, family_id: 'f1', room_id: roomId, type: 'drawer', name, x: 0, y: 0, updated_at: '2026-01-01', deleted_at: null,
+  id, family_id: 'f1', room_id: roomId, type: 'drawer', name, x: 0, y: 0, compartments: [], updated_at: '2026-01-01', deleted_at: null,
 })
 const item = (id: string, storageId: string, name: string, memo: string): DecItem => ({
-  id, family_id: 'f1', storage_id: storageId, emoji: '📦', photo_path: null,
+  id, family_id: 'f1', storage_id: storageId, compartment_id: null, emoji: '📦', photo_path: null,
   created_by: 'u1', created_at: '2026-01-01', updated_at: '2026-01-01', deleted_at: null, name, memo,
 })
 

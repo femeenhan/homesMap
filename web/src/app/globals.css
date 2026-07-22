@@ -268,6 +268,30 @@ header{
 .item-del{color:var(--ink-soft);font-size:13px;padding:4px}
 .item-del:hover{color:var(--danger)}
 .dp-empty{color:var(--ink-soft);font-size:12.5px;text-align:center;padding:18px 0}
+/* ---------- 수납장 칸(compartment) 트리 ---------- */
+.cmp-add{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding-bottom:10px;border-bottom:1px dashed var(--line)}
+.cmp-chip{padding:5px 10px;border-radius:var(--r-pill,9999px);background:var(--accent-soft);color:var(--accent-ink);font-size:12px;font-weight:700}
+.cmp-chip:hover{opacity:.85}
+.cmp-add-form{display:flex;gap:4px;flex:1;min-width:120px}
+.cmp-add-form input{flex:1;min-width:0;padding:6px 9px;border-radius:8px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-size:12.5px;outline:none}
+.cmp-add-form input:focus{border-color:var(--accent)}
+.cmp-add-form button{padding:6px 10px;border-radius:8px;background:var(--bg);color:var(--ink-soft);font-size:12px;font-weight:700;flex-shrink:0}
+.cmp-add-form button:disabled{opacity:.5}
+.cmp-group{display:flex;flex-direction:column;gap:6px}
+.cmp-head{display:flex;align-items:center;gap:6px}
+.cmp-name{flex:1;min-width:0;font-size:12.5px;font-weight:800;color:var(--ink);background:transparent;border:none;border-bottom:1.5px solid transparent;outline:none;padding:2px 0}
+.cmp-name:focus{border-bottom-color:var(--accent)}
+.cmp-name-static{flex:1;font-size:12.5px;font-weight:800;color:var(--ink-soft)}
+.cmp-count{font-size:11px;color:var(--ink-soft);background:var(--bg);border-radius:9px;padding:1px 7px;flex-shrink:0}
+.cmp-add-here,.cmp-del{font-size:12.5px;padding:2px 5px;color:var(--ink-soft);flex-shrink:0}
+.cmp-add-here:hover{color:var(--accent)}
+.cmp-del:hover{color:var(--danger)}
+.cmp-empty{font-size:11.5px;color:var(--ink-soft);padding:1px 0 4px 4px}
+.cmp-select{
+  width:100%;padding:9px 11px;border-radius:9px;border:1.5px solid var(--line);
+  background:var(--surface);color:var(--ink);font-size:13.5px;outline:none;
+}
+.cmp-select:focus{border-color:var(--accent)}
 .dp-form{border-top:1px solid var(--line);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
 .dp-form .row{display:flex;gap:8px}
 .dp-form input[type=text]{

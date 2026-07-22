@@ -13,7 +13,7 @@ import { Toolbar } from '@/components/Toolbar'
 import { MapCanvas } from '@/components/MapCanvas'
 import { DetailPanel } from '@/components/DetailPanel'
 import { RoomDetail } from '@/components/RoomDetail'
-import type { Room, Storage, Item, DecItem, FamilyMember, Tool, StorageTypeKey, Activity, ItemDraft } from '@/lib/types'
+import type { Room, Storage, Item, DecItem, FamilyMember, Tool, StorageTypeKey, Activity, ItemDraft, Compartment } from '@/lib/types'
 import { STORAGE_TYPES } from '@/lib/types'
 import { recomputeChildStorages } from '@/lib/geometry'
 import type { Pt, Rect } from '@/lib/geometry'
@@ -264,6 +264,7 @@ export default function AppHomePage() {
       name,
       x: Math.round(point.x),
       y: Math.round(point.y),
+      compartments: [],
       updated_at: new Date().toISOString(),
       deleted_at: null,
     }
@@ -298,6 +299,15 @@ export default function AppHomePage() {
   async function handleStorageRename(storage: Storage, name: string) {
     if (!data) return
     const updated: Storage = { ...storage, name, updated_at: new Date().toISOString() }
+    await store.putLocal('storages', updated, { dirty: true })
+    setData((d) => d && { ...d, storages: d.storages.map((s) => (s.id === storage.id ? updated : s)) })
+    try { await push() } catch { showToast('오프라인 — 나중에 동기화됩니다') }
+  }
+
+  // 칸 목록 변경(추가·이름수정·삭제 전부 전체 목록 교체). 삭제된 칸의 물건은 클라가 미분류로 폴백 — 물건 재기록 없음.
+  async function handleCompartmentsChange(storage: Storage, compartments: Compartment[]) {
+    if (!data) return
+    const updated: Storage = { ...storage, compartments, updated_at: new Date().toISOString() }
     await store.putLocal('storages', updated, { dirty: true })
     setData((d) => d && { ...d, storages: d.storages.map((s) => (s.id === storage.id ? updated : s)) })
     try { await push() } catch { showToast('오프라인 — 나중에 동기화됩니다') }
@@ -459,6 +469,7 @@ export default function AppHomePage() {
         id: itemId,
         family_id: data.familyId,
         storage_id: storage.id,
+        compartment_id: draft.compartmentId ?? null,
         enc_name,
         enc_memo,
         emoji: '📦',
@@ -609,6 +620,7 @@ export default function AppHomePage() {
             members={data.members}
             onClose={() => selectStorage(null)}
             onRename={(name) => handleStorageRename(selectedStorage, name)}
+            onCompartmentsChange={(compartments) => handleCompartmentsChange(selectedStorage, compartments)}
             onItemsAdd={(drafts) => handleItemsAdd(selectedStorage, storageRoom, drafts)}
             onItemDelete={handleItemDelete}
             onStorageDelete={handleStorageDelete}
