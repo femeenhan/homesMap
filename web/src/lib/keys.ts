@@ -10,6 +10,16 @@ export const keys = {
   setFDK: (k: CryptoKey) => { sessionFDK = k },
 }
 
+type SupabaseClient = ReturnType<typeof createClient>
+
+// 여러 가족에 속한 사용자도 항상 같은(가장 먼저 가입한) 가족을 고르도록 정렬 — 순서 없으면 조회마다 달라질 수 있음.
+// page.tsx의 boot()/reconcileWithServer()와 이 파일의 unlock 함수들이 모두 이 헬퍼 하나를 공유.
+export async function fetchPrimaryFamilyId(supabase: SupabaseClient, userId: string): Promise<string | undefined> {
+  const { data } = await supabase.from('family_members').select('family_id').eq('user_id', userId)
+    .order('joined_at', { ascending: true }).limit(1)
+  return data?.[0]?.family_id
+}
+
 /** 새 가족: FDK 생성 → owner 멤버 행에 래핑 저장 → 복구코드(원본 FDK) 반환(1회 표시용) */
 export async function createFamilyWithKey(familyName: string, displayName: string, passphrase: string): Promise<{ familyId: string; recoveryCode: string }> {
   const supabase = createClient()
@@ -58,6 +68,22 @@ export async function unlockWithPassphrase(passphrase: string): Promise<void> {
   }
   if (!wrapped) throw new Error('래핑 키 없음')
   keys.setFDK(await unwrapFDK(wrapped, passphrase))  // 틀리면 throw
+
+  // 패스프레이즈 해제는 계정 전환이 불가(로컬/서버에 저장된 wrapped_family_key와 일치해야만 성공) — clearFamilyData 불필요.
+  // 다만 온라인이면 familyId/userId 메타를 최신화해 boot()의 메타-우선 경로가 최신 신원을 쓰도록 함(최선노력).
+  try {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const familyId = await fetchPrimaryFamilyId(supabase, user.id)
+      if (familyId) {
+        await store.setMeta('familyId', familyId)
+        await store.setMeta('userId', user.id)
+      }
+    }
+  } catch {
+    // 오프라인 등으로 최신화를 못해도 메타는 이전 온라인 부팅 때 캐싱된 값을 그대로 유지 — 잠금해제 자체는 이미 성공
+  }
 }
 
 // 로컬 캐시 먼저(오프라인 가능) → 없으면 네트워크(RLS로 내 가족 행만 조회) — 둘 다 없으면 아직 아무것도 암호화 안 된 새 가족
@@ -93,6 +119,23 @@ export async function unlockWithRecoveryCode(code: string, newPassphrase: string
   if (user) await supabase.from('family_members').update({ wrapped_family_key: wrapped }).eq('user_id', user.id)
   await store.setMeta('wrappedKey', wrapped)
   keys.setFDK(fdk)
+
+  // 계정 전환 감지: 복구코드는 패스프레이즈와 달리 로컬 wrappedKey와 무관하게 어떤 가족이든 열 수 있으므로,
+  // 이 기기에 이전 가족의 평문 캐시가 남아있을 수 있다. boot()의 백그라운드 대조를 기다리면 그 사이 렌더된
+  // 화면에 이전 가족의 방/수납장 이름(암호화 안 됨)이 잠깐 노출됨 — 여기서 미리 지워 그 창을 없앤다.
+  if (user) {
+    try {
+      const authoritativeFamilyId = await fetchPrimaryFamilyId(supabase, user.id)
+      if (authoritativeFamilyId) {
+        const cachedFamilyId = await store.getMeta<string>('familyId')
+        if (authoritativeFamilyId !== cachedFamilyId) await store.clearFamilyData()
+        await store.setMeta('familyId', authoritativeFamilyId)
+        await store.setMeta('userId', user.id)
+      }
+    } catch {
+      // 네트워크 실패 등으로 대조를 못해도 방금 세운 세션(FDK)은 그대로 반환 — boot()의 reconcileWithServer가 백스톱
+    }
+  }
 }
 
 /** 초대 링크 생성: token 발급 + FDK를 URL 프래그먼트로(서버 미전송) */

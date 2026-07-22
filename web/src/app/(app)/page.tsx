@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { keys } from '@/lib/keys'
+import { keys, fetchPrimaryFamilyId } from '@/lib/keys'
 import { store } from '@/lib/store'
 import { syncNow, push, pull } from '@/lib/sync'
 import { decryptField, encryptField, encryptBytes } from '@/lib/crypto'
@@ -27,19 +27,10 @@ type BootData = {
   skippedCount: number
 }
 
-type SupabaseClient = ReturnType<typeof createClient>
-
-// 여러 가족에 속한 사용자도 항상 같은(가장 먼저 가입한) 가족을 고르도록 정렬 — 순서 없으면 조회마다 달라질 수 있음
-async function fetchPrimaryFamilyId(supabase: SupabaseClient, userId: string): Promise<string | undefined> {
-  const { data } = await supabase.from('family_members').select('family_id').eq('user_id', userId)
-    .order('joined_at', { ascending: true }).limit(1)
-  return data?.[0]?.family_id
-}
-
 export default function AppHomePage() {
   const router = useRouter()
   const [data, setData] = useState<BootData | null>(null)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<Mode>('select')
   const [palType, setPalType] = useState<StorageTypeKey>('drawer')
   const [selectedStorageId, setSelectedStorageId] = useState<string | null>(null)
@@ -97,7 +88,7 @@ export default function AppHomePage() {
         const { data: membershipRows } = await supabase.from('family_members').select('id').eq('user_id', user.id).limit(1)
         router.replace(membershipRows && membershipRows.length > 0 ? '/unlock' : '/onboarding')
       } catch {
-        setError(true)
+        setError('연결에 문제가 있어요. 새로고침 해주세요.')
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -110,7 +101,13 @@ export default function AppHomePage() {
 
     if (cachedFamilyId) {
       const cachedUserId = (await store.getMeta<string>('userId')) ?? ''
-      await loadLocalData(cachedFamilyId, cachedUserId, false)
+      try {
+        await loadLocalData(cachedFamilyId, cachedUserId, false)
+      } catch {
+        // 네트워크가 아니라 로컬 IndexedDB 조회/복호화 자체가 실패한 경우 — 네트워크 오류 문구와 구분, 리다이렉트 없음
+        setError('저장된 데이터를 불러오지 못했어요. 새로고침 해주세요.')
+        return
+      }
       await reconcileWithServer(cachedFamilyId)
       return
     }
@@ -120,7 +117,7 @@ export default function AppHomePage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace('/login'); return }
       const familyId = await fetchPrimaryFamilyId(supabase, user.id)
-      if (!familyId) { setError(true); return }
+      if (!familyId) { setError('연결에 문제가 있어요. 새로고침 해주세요.'); return }
       await store.setMeta('familyId', familyId)
       await store.setMeta('userId', user.id)
 
@@ -132,7 +129,7 @@ export default function AppHomePage() {
       }
       await loadLocalData(familyId, user.id, offline)
     } catch {
-      setError(true) // 로컬 캐시가 전혀 없는 최초 부팅에서만 사용 — 오프라인 경로(위 분기)는 이 에러 화면을 타지 않음
+      setError('연결에 문제가 있어요. 새로고침 해주세요.') // 로컬 캐시가 전혀 없는 최초 부팅에서만 사용 — 오프라인 경로(위 분기)는 이 에러 화면을 타지 않음
     }
   }
 
@@ -458,7 +455,7 @@ export default function AppHomePage() {
           gap: '12px',
         }}
       >
-        <p>연결에 문제가 있어요. 새로고침 해주세요.</p>
+        <p>{error}</p>
         <button type="button" onClick={() => location.reload()} style={{ padding: '10px', fontSize: '16px' }}>
           다시 시도
         </button>
