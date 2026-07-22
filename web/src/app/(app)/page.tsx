@@ -11,7 +11,7 @@ import { useToast } from '@/lib/useToast'
 import { Header } from '@/components/Header'
 import { Toolbar } from '@/components/Toolbar'
 import { MapCanvas } from '@/components/MapCanvas'
-import type { Room, Storage, Item, DecItem, FamilyMember, Mode, StorageTypeKey } from '@/lib/types'
+import type { Room, Storage, Item, DecItem, FamilyMember, Mode, StorageTypeKey, Activity } from '@/lib/types'
 import type { Pt, Rect } from '@/lib/geometry'
 
 type BootData = {
@@ -194,10 +194,20 @@ export default function AppHomePage() {
     if (!fdk) return
     try {
       const enc_payload = await encryptField(fdk, JSON.stringify({ roomName, storageName }))
-      const supabase = createClient()
-      await supabase.from('activity').insert({ family_id: familyId, actor_id: actorId, kind: 'storage_added', enc_payload })
+      const row: Activity = {
+        id: crypto.randomUUID(),
+        family_id: familyId,
+        actor_id: actorId,
+        kind: 'storage_added',
+        enc_payload,
+        created_at: new Date().toISOString(),
+      }
+      // 로컬 에코 먼저(다음 pull 전에도 활동 피드가 즉시 보이도록) — dirty 큐엔 안 올림(activity는 애초에 push 대상이 아님)
+      await store.putLocal('activity', row, { dirty: false })
+      // 서버에도 같은 id/created_at으로 insert — 나중에 pull()의 bulkPut이 같은 id를 덮어써 중복 없음
+      await createClient().from('activity').insert(row)
     } catch {
-      // 오프라인 등 — 활동 기록은 최선노력이라 조용히 스킵
+      // 오프라인 등으로 서버 insert가 실패해도 위 로컬 에코는 이미 반영된 뒤라 그대로 유지됨 — 최선노력이라 조용히 스킵
     }
   }
 
