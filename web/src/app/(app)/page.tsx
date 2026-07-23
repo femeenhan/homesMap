@@ -10,12 +10,12 @@ import { GUEST_MODE, GUEST_FAMILY_ID, GUEST_USER_ID, GUEST_FDK_CODE, guestSessio
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/lib/useToast'
 import { Header } from '@/components/Header'
-import { Toolbar } from '@/components/Toolbar'
+import { ActivityFeed } from '@/components/ActivityFeed'
 import { MapCanvas } from '@/components/MapCanvas'
 import { DetailPanel } from '@/components/DetailPanel'
 import { RoomDetail } from '@/components/RoomDetail'
 import { HomeTree } from '@/components/HomeTree'
-import type { Room, Storage, Item, DecItem, FamilyMember, Tool, Activity, ItemDraft, Compartment } from '@/lib/types'
+import type { Room, Storage, Item, DecItem, FamilyMember, Activity, ItemDraft, Compartment } from '@/lib/types'
 import { recomputeChildStorages } from '@/lib/geometry'
 import { descendantIds } from '@/lib/compartments'
 import type { Pt, Rect } from '@/lib/geometry'
@@ -36,8 +36,8 @@ export default function AppHomePage() {
   const router = useRouter()
   const [data, setData] = useState<BootData | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [tool, setTool] = useState<Tool>('none')
   const [view, setView] = useState<'list' | 'map'>('list') // 목록(카테고리 트리)이 기본, 도식화(지도)는 보조
+  const [showActivity, setShowActivity] = useState(false)
   // 선택은 수납장/방 중 하나만 — 물건 드로어와 방 드로어가 배타적으로 열린다.
   const [selectedStorageId, setSelectedStorageId] = useState<string | null>(null)
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
@@ -57,7 +57,6 @@ export default function AppHomePage() {
   // 검색 결과 클릭: 도식화 뷰로 전환(드로어·flash가 지도 뷰에만 있으므로) + 물건 드로어 열기 + 지도에 4초 flash
   function handleSearchPick(storageId: string) {
     setView('map')
-    setTool('none')
     selectStorage(storageId)
     setFlashStorageId(storageId)
     if (flashTimerRef.current) clearTimeout(flashTimerRef.current)
@@ -257,7 +256,6 @@ export default function AppHomePage() {
     await store.putLocal('rooms', row, { dirty: true })
     setData((d) => d && { ...d, rooms: [...d.rooms, row] })
     selectRoom(row.id)
-    setTool('none')
     try {
       await push()
     } catch {
@@ -284,7 +282,6 @@ export default function AppHomePage() {
     await store.putLocal('storages', row, { dirty: true })
     setData((d) => d && { ...d, storages: [...d.storages, row] })
     selectStorage(row.id)
-    setTool('none')
     try {
       await push()
     } catch {
@@ -667,6 +664,7 @@ export default function AppHomePage() {
         rooms={data.rooms}
         onToast={showToast}
         onSearchPick={handleSearchPick}
+        onActivityClick={() => setShowActivity(true)}
       />
       {data.offline && <div className="offline-notice">오프라인 — 저장된 데이터로 표시 중</div>}
       {data.skippedCount > 0 && (
@@ -700,9 +698,8 @@ export default function AppHomePage() {
         </div>
       ) : (
         <div className="main">
-          <Toolbar tool={tool} onToolChange={setTool} activity={data.activity} members={data.members} />
           <MapCanvas
-            tool={tool}
+            tool="none"
             rooms={data.rooms}
             storages={data.storages}
             decItems={data.decItems}
@@ -745,6 +742,16 @@ export default function AppHomePage() {
               onDelete={handleRoomDelete}
             />
           )}
+        </div>
+      )}
+      {showActivity && (
+        <div className="sheet-wrap" onClick={() => setShowActivity(false)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="sheet-close" onClick={() => setShowActivity(false)} aria-label="닫기">✕</button>
+            <div className="sheet-body">
+              <ActivityFeed activity={data.activity} members={data.members} />
+            </div>
+          </div>
         </div>
       )}
       <div className={`toast${toastMsg ? ' show' : ''}`}>{toastMsg}</div>

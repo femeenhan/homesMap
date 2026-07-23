@@ -13,9 +13,10 @@ type Props = {
   rooms: Room[]
   onToast: (msg: string) => void
   onSearchPick: (storageId: string) => void
+  onActivityClick: () => void
 }
 
-export function Header({ familyId, members, decItems, storages, rooms, onToast, onSearchPick }: Props) {
+export function Header({ familyId, members, decItems, storages, rooms, onToast, onSearchPick, onActivityClick }: Props) {
   const [fallbackLink, setFallbackLink] = useState<string | null>(null)
   const [inviting, setInviting] = useState(false)
 
@@ -55,6 +56,9 @@ export function Header({ familyId, members, decItems, storages, rooms, onToast, 
             </span>
           ))}
         </div>
+        <button type="button" className="hdr-icon-btn" onClick={onActivityClick} title="가족 활동" aria-label="가족 활동">
+          🕘
+        </button>
         <button type="button" className="invite-btn" onClick={handleInvite} disabled={inviting}>
           👨‍👩‍👧 가족 초대
         </button>
