@@ -306,9 +306,9 @@ header{
 /* 행: [caret][아이콘][이름] … 우측 액션은 hover 시에만 */
 .trow{display:flex;align-items:center;gap:6px;min-height:44px;padding:0 6px;border-radius:7px;cursor:pointer}
 .trow:hover{background:var(--bg)}
-.trow-caret{width:14px;flex-shrink:0;font-size:9px;color:var(--ink-soft);text-align:center;line-height:1;user-select:none}
+.trow-caret{width:14px;flex-shrink:0;font-size:9px;color:var(--ink-soft);text-align:center;line-height:1;user-select:none;background:none;border:none;padding:0;cursor:pointer}
 .trow-ico{flex-shrink:0;font-size:15px;line-height:1}
-.trow-name{flex:1;min-width:0;font-size:14px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:none}
+.trow-name{flex:1;min-width:0;font-size:14px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:none;background:transparent;border:none;outline:none;padding:0}
 .trow-name-input{flex:1;min-width:0;font-size:14px;color:var(--ink);background:var(--surface);border:none;outline:none;padding:4px 6px;border-radius:6px;box-shadow:0 0 0 1.5px var(--accent)}
 .trow.lv-room .trow-name{font-weight:700}
 .trow.lv-storage .trow-name{font-weight:600}

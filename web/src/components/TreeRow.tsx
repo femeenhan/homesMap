@@ -45,7 +45,12 @@ export function TreeRow({
 
   return (
     <div className={`trow ${levelClass}`.trim()} style={pad(depth)} onClick={editing ? undefined : onToggle}>
-      <span className="trow-caret">{expandable ? (expanded ? '▾' : '▸') : ''}</span>
+      {expandable ? (
+        <button type="button" className="trow-caret" aria-label={expanded ? '접기' : '펼치기'} aria-expanded={expanded}
+          onClick={(e) => { e.stopPropagation(); onToggle() }}>{expanded ? '▾' : '▸'}</button>
+      ) : (
+        <span className="trow-caret" aria-hidden="true" />
+      )}
       <span className="trow-ico">{icon}</span>
       {editing ? (
         <input
