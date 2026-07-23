@@ -6,7 +6,7 @@ import { childCompartments } from '@/lib/compartments'
 import { TreeRow } from './TreeRow'
 
 type AddDraft = { name: string; memo: string; photoFile?: File }
-const pad = (d: number) => ({ paddingLeft: d * 16 + 6 })
+const pad = (d: number) => ({ paddingLeft: d * 14 + 6 }) // TreeRow와 동일 들여쓰기(스펙 §12 16→14) — 행/자식 폼·아이템 정렬 일치
 
 // 인라인 확인 삭제. 평소엔 🗑️(hover 시 노출), 누르면 삭제/취소 2단계. 방·수납장·칸·물건 공용.
 export function DeleteBtn({ title, onConfirm }: { title: string; onConfirm: () => void }) {
