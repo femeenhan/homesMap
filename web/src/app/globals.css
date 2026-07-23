@@ -49,6 +49,10 @@ body{
 }
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input,textarea{font-family:inherit}
+/* iOS 사파리: 16px 미만 입력 포커스 시 자동 확대(줌)되고 해제도 안 됨 → 터치 기기는 입력 폰트 16px 고정으로 줌 자체 차단 */
+@media (hover:none) and (pointer:coarse){
+  input[type=text],input[type=email],input[type=password],textarea{font-size:16px}
+}
 
 /* ---------- Header ---------- */
 header{
