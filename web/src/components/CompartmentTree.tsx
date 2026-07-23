@@ -97,8 +97,8 @@ export function InlineAddForm({ depth, onAddCompartment, onAddItem, onCancel }: 
       }}
     >
       <div className="taddx-kind">
-        <button type="button" className={kind === 'cmp' ? 'on' : ''} aria-pressed={kind === 'cmp'} onClick={() => setKind('cmp')}>칸</button>
-        <button type="button" className={kind === 'item' ? 'on' : ''} aria-pressed={kind === 'item'} onClick={() => setKind('item')}>물건</button>
+        <button type="button" className={kind === 'cmp' ? 'on' : ''} aria-pressed={kind === 'cmp'} onClick={() => setKind('cmp')}>칸 추가</button>
+        <button type="button" className={kind === 'item' ? 'on' : ''} aria-pressed={kind === 'item'} onClick={() => setKind('item')}>물건 추가</button>
       </div>
       <div className="taddx-row">
         <input autoFocus type="text" placeholder={kind === 'cmp' ? '칸 이름' : '물건 이름'} maxLength={kind === 'cmp' ? 20 : 30}
