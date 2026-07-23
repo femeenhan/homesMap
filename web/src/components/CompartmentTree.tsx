@@ -198,11 +198,10 @@ type NodeProps = {
 
 function CompartmentNode(p: NodeProps) {
   const [expanded, setExpanded] = useState(false)
-  const [adding, setAdding] = useState<'none' | 'cmp' | 'item'>('none')
+  const [adding, setAdding] = useState(false)
   const children = childCompartments(p.compartments, p.compartment.id)
   const myItems = p.items.filter((it) => it.compartment_id === p.compartment.id)
   const hasKids = children.length > 0 || myItems.length > 0
-  const startAdd = (m: 'cmp' | 'item') => { setExpanded(true); setAdding(m) }
 
   return (
     <div className="tnode">
@@ -211,17 +210,17 @@ function CompartmentNode(p: NodeProps) {
         expandable={hasKids}
         expanded={expanded} onToggle={() => setExpanded((e) => !e)}
         onRename={(n) => p.onRename(p.compartment.id, n)}
-        addOptions={[
-          { label: '＋ 칸', onSelect: () => startAdd('cmp') },
-          { label: '＋ 물건', onSelect: () => startAdd('item') },
-        ]}
         deleteTitle="칸 삭제" deleteMessage={`'${p.compartment.name}' 칸과 그 안의 칸·물건이 함께 삭제됩니다`}
         onDelete={() => p.onDeleteCompartment(p.compartment.id)}
       />
       {expanded && (
         <>
-          {adding === 'cmp' && <InlineInput depth={p.depth + 1} placeholder="새 칸 이름" onSubmit={(n) => { p.onAddCompartment(p.compartment.id, n); setAdding('none') }} onCancel={() => setAdding('none')} />}
-          {adding === 'item' && <InlineItemForm depth={p.depth + 1} onSubmit={async (d) => { await p.onAddItem(p.compartment.id, d); setAdding('none') }} onCancel={() => setAdding('none')} />}
+          {adding
+            ? <InlineAddForm depth={p.depth + 1}
+                onAddCompartment={(n) => { p.onAddCompartment(p.compartment.id, n); setAdding(false) }}
+                onAddItem={async (d) => { await p.onAddItem(p.compartment.id, d); setAdding(false) }}
+                onCancel={() => setAdding(false)} />
+            : <AddRow depth={p.depth + 1} label="추가" onClick={() => setAdding(true)} />}
           {children.map((c) => <CompartmentNode {...p} key={c.id} compartment={c} depth={p.depth + 1} />)}
           {myItems.map((it) => <ItemRow key={it.id} item={it} photoUrl={p.photoUrls?.[it.id]} depth={p.depth + 1} onDelete={p.onDeleteItem} />)}
         </>
