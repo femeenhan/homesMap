@@ -368,7 +368,7 @@ header{
 .tadd-row:hover{background:var(--accent-soft)}
 .taddx{flex-direction:column;align-items:stretch;gap:6px}
 .taddx-kind{display:flex;gap:4px}
-.taddx-kind button{flex:1;font-size:12.5px;font-weight:700;padding:8px;border-radius:8px;background:var(--panel);color:var(--ink-soft)}
+.taddx-kind button{flex:1;font-size:12.5px;font-weight:700;padding:8px;border-radius:8px;background:var(--bg);color:var(--ink-soft)}
 .taddx-kind button.on{background:var(--accent-soft);color:var(--accent-ink)}
 .taddx-row{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
 .taddx-more{align-self:flex-start;font-size:12px;font-weight:600;color:var(--accent-ink);padding:4px 2px}
