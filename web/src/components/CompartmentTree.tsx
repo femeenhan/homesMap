@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { Storage, DecItem, FamilyMember, Compartment } from '@/lib/types'
 import { childCompartments } from '@/lib/compartments'
+import { TreeRow } from './TreeRow'
 
 type AddDraft = { name: string; memo: string; photoFile?: File }
 const pad = (d: number) => ({ paddingLeft: d * 16 + 6 })
@@ -144,30 +145,26 @@ type NodeProps = {
 
 function CompartmentNode(p: NodeProps) {
   const [expanded, setExpanded] = useState(false)
-  const [name, setName] = useState(p.compartment.name)
   const [adding, setAdding] = useState<'none' | 'cmp' | 'item'>('none')
   const children = childCompartments(p.compartments, p.compartment.id)
   const myItems = p.items.filter((it) => it.compartment_id === p.compartment.id)
   const hasKids = children.length > 0 || myItems.length > 0
-  const toggle = () => setExpanded((e) => !e)
   const startAdd = (m: 'cmp' | 'item') => { setExpanded(true); setAdding(m) }
 
   return (
     <div className="tnode">
-      <div className="trow" style={pad(p.depth)}>
-        <button type="button" className="trow-caret" onClick={toggle}>{hasKids ? (expanded ? '▼' : '▶') : ''}</button>
-        <span className="trow-ico" onClick={toggle}>📁</span>
-        <input className="trow-name" type="text" aria-label="칸 이름" value={name} maxLength={20}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={() => { const n = name.trim(); if (n && n !== p.compartment.name) p.onRename(p.compartment.id, n); else setName(p.compartment.name) }}
-          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
-        {myItems.length > 0 && <span className="trow-meta">{myItems.length}</span>}
-        <span className="trow-actions">
-          <button type="button" className="trow-act" onClick={() => startAdd('cmp')}>＋칸</button>
-          <button type="button" className="trow-act" onClick={() => startAdd('item')}>＋물건</button>
-          <DeleteBtn title="칸 삭제(하위 칸·물건 포함)" onConfirm={() => p.onDeleteCompartment(p.compartment.id)} />
-        </span>
-      </div>
+      <TreeRow
+        depth={p.depth} icon="📁" name={p.compartment.name} count={myItems.length}
+        expandable={hasKids}
+        expanded={expanded} onToggle={() => setExpanded((e) => !e)}
+        onRename={(n) => p.onRename(p.compartment.id, n)}
+        addOptions={[
+          { label: '＋ 칸', onSelect: () => startAdd('cmp') },
+          { label: '＋ 물건', onSelect: () => startAdd('item') },
+        ]}
+        deleteTitle="칸 삭제" deleteMessage={`'${p.compartment.name}' 칸과 그 안의 칸·물건이 함께 삭제됩니다`}
+        onDelete={() => p.onDeleteCompartment(p.compartment.id)}
+      />
       {expanded && (
         <>
           {adding === 'cmp' && <InlineInput depth={p.depth + 1} placeholder="새 칸 이름" onSubmit={(n) => { p.onAddCompartment(p.compartment.id, n); setAdding('none') }} onCancel={() => setAdding('none')} />}
