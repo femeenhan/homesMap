@@ -1,0 +1,115 @@
+'use client'
+
+import { useState } from 'react'
+import { Modal } from './Modal'
+
+type AddOption = { label: string; onSelect: () => void }
+
+type Props = {
+  depth: number
+  icon: string
+  name: string
+  count: number
+  expandable: boolean
+  expanded: boolean
+  onToggle: () => void
+  onRename: (name: string) => void
+  addOptions: AddOption[]
+  deleteTitle: string
+  deleteMessage: string
+  onDelete: () => void
+  levelClass?: string
+}
+
+const pad = (d: number) => ({ paddingLeft: d * 14 + 6 })
+
+// 방/수납장/칸 공용 행. 탭=펼치기, 이름수정은 ⋯메뉴로만(탭으로 편집 안 됨), ＋는 하위 추가 트리거.
+export function TreeRow({
+  depth, icon, name, count, expandable, expanded, onToggle,
+  onRename, addOptions, deleteTitle, deleteMessage, onDelete, levelClass = '',
+}: Props) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(name)
+  const [addOpen, setAddOpen] = useState(false)
+
+  function startEdit() { setDraft(name); setEditing(true) }
+  function commitEdit() {
+    const n = draft.trim()
+    if (n && n !== name) onRename(n)
+    setEditing(false)
+  }
+  function handlePlus() {
+    if (addOptions.length === 1) addOptions[0].onSelect()
+    else setAddOpen((o) => !o)
+  }
+
+  return (
+    <div className={`trow ${levelClass}`.trim()} style={pad(depth)} onClick={editing ? undefined : onToggle}>
+      <span className="trow-caret">{expandable ? (expanded ? '▾' : '▸') : ''}</span>
+      <span className="trow-ico">{icon}</span>
+      {editing ? (
+        <input
+          className="trow-name-input" type="text" autoFocus aria-label="이름 수정"
+          value={draft} maxLength={20}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commitEdit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+            else if (e.key === 'Escape') setEditing(false)
+          }}
+        />
+      ) : (
+        <span className="trow-name">{name}</span>
+      )}
+      {!editing && count > 0 && <span className="trow-meta">{count}</span>}
+      {!editing && (
+        <span className="trow-actions" onClick={(e) => e.stopPropagation()}>
+          {addOpen ? (
+            <>
+              {addOptions.map((o) => (
+                <button key={o.label} type="button" className="trow-act"
+                  onClick={() => { o.onSelect(); setAddOpen(false) }}>{o.label}</button>
+              ))}
+              <button type="button" className="trow-iconbtn" aria-label="닫기" onClick={() => setAddOpen(false)}>✕</button>
+            </>
+          ) : (
+            <>
+              {addOptions.length > 0 && (
+                <button type="button" className="trow-iconbtn" aria-label="추가" onClick={handlePlus}>＋</button>
+              )}
+              <RowMenu onEditName={startEdit} onDelete={onDelete} deleteTitle={deleteTitle} deleteMessage={deleteMessage} />
+            </>
+          )}
+        </span>
+      )}
+    </div>
+  )
+}
+
+// ⋯ 메뉴: 이름 수정 / 삭제. 시트(.sheet) 재사용, 삭제는 Modal 확인.
+function RowMenu({ onEditName, onDelete, deleteTitle, deleteMessage }: {
+  onEditName: () => void; onDelete: () => void; deleteTitle: string; deleteMessage: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  return (
+    <>
+      <button type="button" className="trow-iconbtn" aria-label="메뉴" onClick={() => setOpen(true)}>⋯</button>
+      {open && (
+        <div className="sheet-wrap" onClick={() => setOpen(false)}>
+          <div className="sheet rowmenu" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="rowmenu-item" onClick={() => { setOpen(false); onEditName() }}>✏️ 이름 수정</button>
+            <button type="button" className="rowmenu-item danger" onClick={() => { setOpen(false); setConfirming(true) }}>🗑️ 삭제</button>
+            <button type="button" className="rowmenu-item cancel" onClick={() => setOpen(false)}>취소</button>
+          </div>
+        </div>
+      )}
+      {confirming && (
+        <Modal title={deleteTitle} message={deleteMessage} okText="삭제"
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => { setConfirming(false); onDelete() }} />
+      )}
+    </>
+  )
+}

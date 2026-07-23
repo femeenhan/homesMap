@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { Room, Storage, DecItem, FamilyMember, Compartment } from '@/lib/types'
 import { CompartmentTree, DeleteBtn, InlineInput, InlineItemForm } from './CompartmentTree'
+import { TreeRow } from './TreeRow'
 
 type AddDraft = { name: string; memo: string; photoFile?: File }
 const pad = (d: number) => ({ paddingLeft: d * 16 + 6 })
@@ -42,25 +43,19 @@ export function HomeTree(p: Props) {
 
 function TreeRoom({ room, ...p }: { room: Room } & Props) {
   const [expanded, setExpanded] = useState(false)
-  const [name, setName] = useState(room.name)
   const [adding, setAdding] = useState(false)
   const storages = p.storages.filter((s) => s.room_id === room.id)
-  const toggle = () => setExpanded((e) => !e)
   return (
     <div className="tnode">
-      <div className="trow lv-room" style={pad(0)}>
-        <button type="button" className="trow-caret" onClick={toggle}>{storages.length ? (expanded ? '▼' : '▶') : ''}</button>
-        <span className="trow-ico" onClick={toggle}>🏠</span>
-        <input className="trow-name" type="text" aria-label="방 이름" value={name} maxLength={20}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={() => { const n = name.trim(); if (n && n !== room.name) p.onRenameRoom(room, n); else setName(room.name) }}
-          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
-        {storages.length > 0 && <span className="trow-meta">{storages.length}</span>}
-        <span className="trow-actions">
-          <button type="button" className="trow-act" onClick={() => { setExpanded(true); setAdding(true) }}>＋수납장</button>
-          <DeleteBtn title="방 삭제(수납장·물건 포함)" onConfirm={() => p.onDeleteRoom(room)} />
-        </span>
-      </div>
+      <TreeRow
+        depth={0} levelClass="lv-room" icon="🏠" name={room.name} count={storages.length}
+        expandable={storages.length > 0}
+        expanded={expanded} onToggle={() => setExpanded((e) => !e)}
+        onRename={(n) => p.onRenameRoom(room, n)}
+        addOptions={[{ label: '＋ 수납장', onSelect: () => { setExpanded(true); setAdding(true) } }]}
+        deleteTitle="방 삭제" deleteMessage={`'${room.name}' 방과 그 안의 수납장·물건이 함께 삭제됩니다`}
+        onDelete={() => p.onDeleteRoom(room)}
+      />
       {expanded && (
         <>
           {adding && <InlineInput depth={1} placeholder="수납장 이름 (예: 서랍장1)" onSubmit={(n) => { p.onAddStorage(room, n); setAdding(false) }} onCancel={() => setAdding(false)} />}

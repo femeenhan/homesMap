@@ -304,37 +304,51 @@ header{
 .cmp-content{display:flex;flex-direction:column}
 
 /* 행: [caret][아이콘][이름] … 우측 액션은 hover 시에만 */
-.trow{display:flex;align-items:center;gap:6px;height:30px;padding:0 6px;border-radius:7px}
+.trow{display:flex;align-items:center;gap:6px;min-height:44px;padding:0 6px;border-radius:7px;cursor:pointer}
 .trow:hover{background:var(--bg)}
-.trow-caret{width:14px;flex-shrink:0;font-size:9px;color:var(--ink-soft);text-align:center;line-height:1;cursor:pointer;user-select:none}
-.trow-ico{flex-shrink:0;font-size:14px;cursor:pointer;line-height:1}
-.trow-name{flex:1;min-width:0;font-size:13.5px;color:var(--ink);background:transparent;border:none;outline:none;padding:0;text-overflow:ellipsis}
-.trow-name::placeholder{color:var(--ink-soft)}
+.trow-caret{width:14px;flex-shrink:0;font-size:9px;color:var(--ink-soft);text-align:center;line-height:1;user-select:none}
+.trow-ico{flex-shrink:0;font-size:15px;line-height:1}
+.trow-name{flex:1;min-width:0;font-size:14px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:none}
+.trow-name-input{flex:1;min-width:0;font-size:14px;color:var(--ink);background:var(--surface);border:none;outline:none;padding:4px 6px;border-radius:6px;box-shadow:0 0 0 1.5px var(--accent)}
 .trow.lv-room .trow-name{font-weight:700}
 .trow.lv-storage .trow-name{font-weight:600}
-.trow-name:focus{background:var(--surface);box-shadow:0 0 0 1.5px var(--accent);border-radius:5px}
 .trow-meta{font-size:11px;color:var(--ink-soft);flex-shrink:0;margin-left:6px}
-.trow:hover .trow-meta{display:none}
-.trow-actions{display:none;align-items:center;gap:2px;flex-shrink:0;margin-left:6px}
-.trow:hover .trow-actions{display:flex}
-.trow-act{font-size:11px;font-weight:600;color:var(--ink-soft);padding:3px 7px;border-radius:6px;white-space:nowrap}
-.trow-act:hover{background:var(--accent-soft);color:var(--accent-ink)}
-.trow-del{font-size:12px;padding:3px 5px;color:var(--ink-soft);border-radius:6px}
+.trow-actions{display:flex;align-items:center;gap:2px;flex-shrink:0;margin-left:auto}
+.trow-act{font-size:12px;font-weight:700;color:var(--accent-ink);background:var(--accent-soft);padding:8px 12px;border-radius:8px;white-space:nowrap}
+.trow-iconbtn{display:flex;align-items:center;justify-content:center;min-width:34px;height:34px;font-size:15px;color:var(--ink-soft);border-radius:8px}
+.trow-iconbtn:hover{background:var(--bg);color:var(--ink)}
+.trow-del{font-size:13px;color:var(--ink-soft);border-radius:8px;min-width:34px;height:34px;display:flex;align-items:center;justify-content:center}
 .trow-del:hover{background:var(--danger);color:#fff}
+/* 데스크톱(hover 가능): 노션처럼 우측 액션은 hover 시에만, 행은 더 조밀 */
+@media (hover:hover){
+  .trow{min-height:34px}
+  .trow-actions{opacity:0;transition:opacity .12s}
+  .trow:hover .trow-actions,.trow-actions:focus-within{opacity:1}
+}
+/* ⋯ 행 메뉴(시트 재사용) */
+.rowmenu{padding:8px}
+.rowmenu-item{display:block;width:100%;text-align:left;padding:14px 16px;font-size:15px;color:var(--ink);border-radius:10px}
+.rowmenu-item:hover{background:var(--bg)}
+.rowmenu-item.danger{color:var(--danger)}
+.rowmenu-item.cancel{color:var(--ink-soft);text-align:center;margin-top:4px}
 .del-confirm{display:flex;gap:3px}
 .del-confirm button{font-size:11px;padding:2px 7px;border-radius:6px;font-weight:700}
 .del-yes{background:var(--danger);color:#fff}
 .btn-ghost{background:var(--bg);color:var(--ink-soft)}
 
 /* 물건 행(단일 라인) */
-.titem{display:flex;align-items:center;gap:8px;height:30px;padding:0 6px;border-radius:7px}
+.titem{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 6px;border-radius:7px}
 .titem:hover{background:var(--bg)}
 .titem-thumb{width:20px;height:20px;border-radius:5px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;overflow:hidden;flex-shrink:0}
 .titem-thumb img{width:100%;height:100%;object-fit:cover}
 .titem-name{font-size:13px;color:var(--ink);flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%}
 .titem-memo{font-size:11.5px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
-.titem .trow-del{display:none;margin-left:auto}
-.titem:hover .trow-del{display:block}
+.titem .trow-del{margin-left:auto}
+@media (hover:hover){
+  .titem{min-height:34px}
+  .titem .trow-del{opacity:0;transition:opacity .12s}
+  .titem:hover .trow-del{opacity:1}
+}
 
 /* 인라인 추가 폼(요청 시에만 등장) */
 .tadd-form{display:flex;flex-wrap:wrap;gap:5px;align-items:center;padding:3px 6px}
