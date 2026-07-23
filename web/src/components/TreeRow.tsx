@@ -3,8 +3,6 @@
 import { useState } from 'react'
 import { Modal } from './Modal'
 
-type AddOption = { label: string; onSelect: () => void }
-
 type Props = {
   depth: number
   icon: string
@@ -14,7 +12,6 @@ type Props = {
   expanded: boolean
   onToggle: () => void
   onRename: (name: string) => void
-  addOptions?: AddOption[]
   deleteTitle: string
   deleteMessage: string
   onDelete: () => void
@@ -23,24 +20,19 @@ type Props = {
 
 const pad = (d: number) => ({ paddingLeft: d * 14 + 6 })
 
-// 방/수납장/칸 공용 행. 탭=펼치기, 이름수정은 ⋯메뉴로만(탭으로 편집 안 됨), ＋는 하위 추가 트리거.
+// 방/수납장/칸 공용 행. 탭=펼치기, 이름수정은 ⋯메뉴로만(탭으로 편집 안 됨). 추가는 각 레벨 상단 AddRow가 담당.
 export function TreeRow({
   depth, icon, name, count, expandable, expanded, onToggle,
-  onRename, addOptions = [], deleteTitle, deleteMessage, onDelete, levelClass = '',
+  onRename, deleteTitle, deleteMessage, onDelete, levelClass = '',
 }: Props) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(name)
-  const [addOpen, setAddOpen] = useState(false)
 
   function startEdit() { setDraft(name); setEditing(true) }
   function commitEdit() {
     const n = draft.trim()
     if (n && n !== name) onRename(n)
     setEditing(false)
-  }
-  function handlePlus() {
-    if (addOptions.length === 1) addOptions[0].onSelect()
-    else setAddOpen((o) => !o)
   }
 
   return (
@@ -70,22 +62,7 @@ export function TreeRow({
       {!editing && count > 0 && <span className="trow-meta">{count}</span>}
       {!editing && (
         <span className="trow-actions" onClick={(e) => e.stopPropagation()}>
-          {addOpen ? (
-            <>
-              {addOptions.map((o) => (
-                <button key={o.label} type="button" className="trow-act"
-                  onClick={() => { o.onSelect(); setAddOpen(false) }}>{o.label}</button>
-              ))}
-              <button type="button" className="trow-iconbtn" aria-label="닫기" onClick={() => setAddOpen(false)}>✕</button>
-            </>
-          ) : (
-            <>
-              {addOptions.length > 0 && (
-                <button type="button" className="trow-iconbtn" aria-label="추가" onClick={handlePlus}>＋</button>
-              )}
-              <RowMenu onEditName={startEdit} onDelete={onDelete} deleteTitle={deleteTitle} deleteMessage={deleteMessage} />
-            </>
-          )}
+          <RowMenu onEditName={startEdit} onDelete={onDelete} deleteTitle={deleteTitle} deleteMessage={deleteMessage} />
         </span>
       )}
     </div>

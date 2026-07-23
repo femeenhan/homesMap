@@ -313,8 +313,8 @@ header{
 .trow.lv-room .trow-name{font-weight:700}
 .trow.lv-storage .trow-name{font-weight:600}
 .trow-meta{font-size:11px;color:var(--ink-soft);flex-shrink:0;margin-left:6px}
-.trow-actions{display:flex;align-items:center;gap:2px;flex-shrink:0;margin-left:auto}
 .trow-act{font-size:12px;font-weight:700;color:var(--accent-ink);background:var(--accent-soft);padding:8px 12px;border-radius:8px;white-space:nowrap}
+.trow-actions{display:flex;align-items:center;gap:2px;flex-shrink:0;margin-left:auto}
 .trow-iconbtn{display:flex;align-items:center;justify-content:center;min-width:34px;height:34px;font-size:15px;color:var(--ink-soft);border-radius:8px}
 .trow-iconbtn:hover{background:var(--bg);color:var(--ink)}
 .trow-del{font-size:13px;color:var(--ink-soft);border-radius:8px;min-width:34px;height:34px;display:flex;align-items:center;justify-content:center}
@@ -372,9 +372,6 @@ header{
 
 /* 드로어(도식화) 상단 칸/물건 추가 · 최하단 방 추가 */
 .dp-actions{display:flex;gap:4px;padding:2px 4px 6px}
-.tree-add-root{margin-top:8px;padding:0 6px}
-.tree-add-root button{font-size:12.5px;font-weight:600;color:var(--ink-soft);padding:6px 10px;border-radius:7px}
-.tree-add-root button:hover{background:var(--accent-soft);color:var(--accent-ink)}
 .dp-form{border-top:1px solid var(--line);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
 .dp-form .row{display:flex;gap:8px}
 .dp-form input[type=text]{
