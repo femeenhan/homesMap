@@ -14,7 +14,7 @@ type Props = {
   expanded: boolean
   onToggle: () => void
   onRename: (name: string) => void
-  addOptions: AddOption[]
+  addOptions?: AddOption[]
   deleteTitle: string
   deleteMessage: string
   onDelete: () => void
@@ -26,7 +26,7 @@ const pad = (d: number) => ({ paddingLeft: d * 14 + 6 })
 // 방/수납장/칸 공용 행. 탭=펼치기, 이름수정은 ⋯메뉴로만(탭으로 편집 안 됨), ＋는 하위 추가 트리거.
 export function TreeRow({
   depth, icon, name, count, expandable, expanded, onToggle,
-  onRename, addOptions, deleteTitle, deleteMessage, onDelete, levelClass = '',
+  onRename, addOptions = [], deleteTitle, deleteMessage, onDelete, levelClass = '',
 }: Props) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(name)

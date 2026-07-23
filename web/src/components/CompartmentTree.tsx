@@ -66,6 +66,59 @@ export function InlineItemForm({ depth, onSubmit, onCancel }: {
   )
 }
 
+// 각 레벨 상단 '＋ 추가' 트리거 행(방·수납장 등 이름만 받는 곳)
+export function AddRow({ depth, label, onClick }: { depth: number; label: string; onClick: () => void }) {
+  return <button type="button" className="tadd-row" style={pad(depth)} onClick={onClick}>＋ {label}</button>
+}
+
+// 수납장/칸 하위 추가: 칸/물건 토글 + 최소입력(이름) + 물건일 때 메모·사진 접힘
+export function InlineAddForm({ depth, onAddCompartment, onAddItem, onCancel }: {
+  depth: number
+  onAddCompartment: (name: string) => void
+  onAddItem: (draft: AddDraft) => void | Promise<void>
+  onCancel: () => void
+}) {
+  const [kind, setKind] = useState<'cmp' | 'item'>('item')
+  const [name, setName] = useState('')
+  const [memo, setMemo] = useState('')
+  const [photo, setPhoto] = useState<File | null>(null)
+  const [details, setDetails] = useState(false)
+  const [busy, setBusy] = useState(false)
+  return (
+    <form className="tadd-form taddx" style={pad(depth)}
+      onSubmit={async (e) => {
+        e.preventDefault()
+        const n = name.trim()
+        if (!n || busy) return
+        if (kind === 'cmp') { onAddCompartment(n); return }
+        setBusy(true)
+        try { await onAddItem({ name: n, memo: memo.trim(), photoFile: photo ?? undefined }) } finally { setBusy(false) }
+      }}
+    >
+      <div className="taddx-kind">
+        <button type="button" className={kind === 'cmp' ? 'on' : ''} aria-pressed={kind === 'cmp'} onClick={() => setKind('cmp')}>📁 칸</button>
+        <button type="button" className={kind === 'item' ? 'on' : ''} aria-pressed={kind === 'item'} onClick={() => setKind('item')}>📦 물건</button>
+      </div>
+      <div className="taddx-row">
+        <input autoFocus type="text" placeholder={kind === 'cmp' ? '칸 이름' : '물건 이름'} maxLength={kind === 'cmp' ? 20 : 30}
+          value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') onCancel() }} />
+        <button type="submit" disabled={!name.trim() || busy}>추가</button>
+        <button type="button" className="btn-ghost" onClick={onCancel}>취소</button>
+      </div>
+      {kind === 'item' && (details ? (
+        <div className="taddx-row">
+          <input type="text" placeholder="메모 (선택)" maxLength={40} value={memo} onChange={(e) => setMemo(e.target.value)} />
+          <label className={`tadd-photo${photo ? ' has' : ''}`}>{photo ? '✅ 사진' : '📷'}
+            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
+          </label>
+        </div>
+      ) : (
+        <button type="button" className="taddx-more" onClick={() => setDetails(true)}>＋ 메모·사진</button>
+      ))}
+    </form>
+  )
+}
+
 function ItemRow({ item, photoUrl, depth, onDelete }: {
   item: DecItem; photoUrl?: string; depth: number; onDelete: (i: DecItem) => void
 }) {
