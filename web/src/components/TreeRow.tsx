@@ -84,8 +84,10 @@ export function RowMenu({ onEditName, onDelete, deleteTitle, deleteMessage }: {
       {open && (
         <div className="sheet-wrap" onClick={() => setOpen(false)}>
           <div className="sheet rowmenu" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="rowmenu-item" onClick={() => { setOpen(false); onEditName() }}>이름 수정</button>
-            <button type="button" className="rowmenu-item danger" onClick={() => { setOpen(false); setConfirming(true) }}>삭제</button>
+            <div className="rowmenu-group">
+              <button type="button" className="rowmenu-item" onClick={() => { setOpen(false); onEditName() }}>이름 수정</button>
+              <button type="button" className="rowmenu-item danger" onClick={() => { setOpen(false); setConfirming(true) }}>삭제</button>
+            </div>
             <button type="button" className="rowmenu-item cancel" onClick={() => setOpen(false)}>취소</button>
           </div>
         </div>

@@ -330,11 +330,13 @@ header{
   .trow:hover .trow-actions,.trow-actions:focus-within{opacity:1}
 }
 /* ⋯ 행 메뉴(시트 재사용) */
-.rowmenu{padding:8px}
-.rowmenu-item{display:block;width:100%;text-align:left;padding:14px 16px;font-size:15px;color:var(--ink);border-radius:10px}
-.rowmenu-item:hover{background:var(--panel)}
+.rowmenu{padding:12px 16px calc(16px + env(safe-area-inset-bottom))}
+.rowmenu-group{background:var(--panel);border-radius:12px;overflow:hidden}
+.rowmenu-group .rowmenu-item + .rowmenu-item{border-top:1px solid var(--line)}
+.rowmenu-item{display:block;width:100%;text-align:center;padding:14px;font-size:15px;font-weight:600;color:var(--ink)}
+.rowmenu-item:hover,.rowmenu-item:active{background:var(--line)}
 .rowmenu-item.danger{color:var(--danger)}
-.rowmenu-item.cancel{color:var(--ink-soft);text-align:center;margin-top:4px}
+.rowmenu-item.cancel{margin-top:8px;background:var(--panel);border-radius:12px;color:var(--ink-soft)}
 .del-confirm{display:flex;gap:3px}
 .del-confirm button{font-size:11px;padding:2px 7px;border-radius:6px;font-weight:700}
 .del-yes{background:var(--danger);color:#fff}
@@ -383,6 +385,9 @@ header{
 .drill-head .trow-name-input{flex:1;font-size:17px;font-weight:600}
 .trow.lv-drill{min-height:48px}
 .lv-drill .trow-caret{display:none}
+/* ⋯와 › 오클릭 방지: ⋯ 히트영역 44px + 화살표와 간격 분리 */
+.lv-drill .trow-iconbtn{min-width:44px;height:44px}
+.lv-drill .trow-chev{margin-left:10px}
 .trow-chev{color:var(--ink-soft);flex-shrink:0}
 
 /* 드로어(도식화) 상단 칸/물건 추가 · 최하단 방 추가 */
