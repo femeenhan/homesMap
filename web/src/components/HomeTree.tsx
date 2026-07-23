@@ -2,11 +2,10 @@
 
 import { useState } from 'react'
 import type { Room, Storage, DecItem, FamilyMember, Compartment } from '@/lib/types'
-import { CompartmentTree, DeleteBtn, InlineInput, InlineItemForm } from './CompartmentTree'
+import { CompartmentTree, InlineInput, InlineItemForm } from './CompartmentTree'
 import { TreeRow } from './TreeRow'
 
 type AddDraft = { name: string; memo: string; photoFile?: File }
-const pad = (d: number) => ({ paddingLeft: d * 16 + 6 })
 
 type Props = {
   rooms: Room[]
@@ -68,29 +67,25 @@ function TreeRoom({ room, ...p }: { room: Room } & Props) {
 
 function TreeStorage({ storage, ...p }: { storage: Storage; room: Room } & Props) {
   const [expanded, setExpanded] = useState(false)
-  const [name, setName] = useState(storage.name)
   const [adding, setAdding] = useState<'none' | 'cmp' | 'item'>('none')
   const items = p.decItems.filter((it) => it.storage_id === storage.id)
   const compartments = storage.compartments ?? []
   const hasKids = compartments.length > 0 || items.length > 0
-  const toggle = () => setExpanded((e) => !e)
   const startAdd = (m: 'cmp' | 'item') => { setExpanded(true); setAdding(m) }
   return (
     <div className="tnode">
-      <div className="trow lv-storage" style={pad(1)}>
-        <button type="button" className="trow-caret" onClick={toggle}>{hasKids ? (expanded ? '▼' : '▶') : ''}</button>
-        <span className="trow-ico" onClick={toggle}>📦</span>
-        <input className="trow-name" type="text" aria-label="수납장 이름" value={name} maxLength={20}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={() => { const n = name.trim(); if (n && n !== storage.name) p.onRenameStorage(storage, n); else setName(storage.name) }}
-          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
-        {items.length > 0 && <span className="trow-meta">{items.length}</span>}
-        <span className="trow-actions">
-          <button type="button" className="trow-act" onClick={() => startAdd('cmp')}>＋칸</button>
-          <button type="button" className="trow-act" onClick={() => startAdd('item')}>＋물건</button>
-          <DeleteBtn title="수납장 삭제(물건 포함)" onConfirm={() => p.onDeleteStorage(storage)} />
-        </span>
-      </div>
+      <TreeRow
+        depth={1} levelClass="lv-storage" icon="📦" name={storage.name} count={items.length}
+        expandable={hasKids}
+        expanded={expanded} onToggle={() => setExpanded((e) => !e)}
+        onRename={(n) => p.onRenameStorage(storage, n)}
+        addOptions={[
+          { label: '＋ 칸', onSelect: () => startAdd('cmp') },
+          { label: '＋ 물건', onSelect: () => startAdd('item') },
+        ]}
+        deleteTitle="수납장 삭제" deleteMessage={`'${storage.name}' 수납장과 그 안의 물건이 함께 삭제됩니다`}
+        onDelete={() => p.onDeleteStorage(storage)}
+      />
       {expanded && (
         <>
           {adding === 'cmp' && <InlineInput depth={2} placeholder="새 칸 이름" onSubmit={(n) => { p.onCompartmentsChange(storage, [...compartments, { id: crypto.randomUUID(), name: n, parent_id: null }]); setAdding('none') }} onCancel={() => setAdding('none')} />}
