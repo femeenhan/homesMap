@@ -247,6 +247,20 @@ header{
 .detail-panel.open{display:flex;animation:dp-slide-in .22s ease-out}
 @keyframes dp-slide-in{from{transform:translateX(100%)}to{transform:translateX(0)}}
 @media (prefers-reduced-motion:reduce){.detail-panel.open{animation:none}}
+/* 모바일: 우측 사이드 드로어 → 바텀시트. 지도는 위에 그대로 보이고, 높이는 내용만큼(최대 75dvh, 넘치면 dp-items가 스크롤). */
+@media (max-width:640px){
+  .detail-panel{
+    top:auto;left:0;right:0;bottom:0;width:auto;height:auto;max-height:75dvh;
+    border-left:none;border-top:1px solid var(--line);border-radius:16px 16px 0 0;
+    box-shadow:0 -6px 20px rgba(72,58,40,.14);
+  }
+  .detail-panel::before{ /* 그랩 핸들 — 시각 표시용(드래그 없음), 닫기는 ✕ */
+    content:'';flex:none;width:38px;height:4px;border-radius:2px;background:var(--line);margin:8px auto 0;
+  }
+  .detail-panel.open{animation:dp-slide-up .24s ease-out}
+}
+@keyframes dp-slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@media (max-width:640px) and (prefers-reduced-motion:reduce){.detail-panel.open{animation:none}}
 .dp-head{padding:16px 16px 12px;border-bottom:1px solid var(--line);position:relative}
 .dp-close{position:absolute;top:12px;right:12px;font-size:15px;color:var(--ink-soft);width:26px;height:26px;border-radius:50%}
 .dp-close:hover{background:var(--bg)}
