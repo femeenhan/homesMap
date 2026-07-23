@@ -18,3 +18,14 @@ export function descendantIds(compartments: Compartment[], id: string): string[]
   }
   return out
 }
+
+// 루트→...→자기 칸 경로(검색 브레드크럼용). 순환 방지.
+export function compartmentPath(compartments: Compartment[], id: string | null): Compartment[] {
+  if (!id) return []
+  const byId = new Map(compartments.map((c) => [c.id, c]))
+  const chain: Compartment[] = []
+  const seen = new Set<string>()
+  let cur = byId.get(id)
+  while (cur && !seen.has(cur.id)) { seen.add(cur.id); chain.unshift(cur); cur = cur.parent_id ? byId.get(cur.parent_id) : undefined }
+  return chain
+}

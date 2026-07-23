@@ -31,6 +31,13 @@ describe('searchItems', () => {
     expect(hits[0]).toMatchObject({ storageId: 's1', roomName: '거실', storageName: '서랍장' })
   })
 
+  it('pathNames: 방→수납장→칸 브레드크럼', () => {
+    const s2 = { ...storageRow('s2', 'r1', '붙박이장'), compartments: [{ id: 'c1', name: '윗칸' }, { id: 'c2', name: '서랍', parent_id: 'c1' }] }
+    const it2 = { ...item('i9', 's2', '양말', ''), compartment_id: 'c2' }
+    const hits = searchItems([it2], [s2], rooms, '양말')
+    expect(hits[0].pathNames).toEqual(['거실', '붙박이장', '윗칸', '서랍'])
+  })
+
   it('빈 쿼리는 빈 배열', () => {
     expect(searchItems(items, storages, rooms, '')).toEqual([])
     expect(searchItems(items, storages, rooms, '   ')).toEqual([])

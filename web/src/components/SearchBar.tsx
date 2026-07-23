@@ -63,7 +63,7 @@ export function SearchBar({ decItems, storages, rooms, onPick }: Props) {
                   <span className="sr-name">{itemById.get(h.itemId)?.name ?? ''}</span>
                   <br />
                   <span className="sr-loc">
-                    📍 {h.roomName} → {h.storageName}
+                    📍 {h.pathNames.join(' › ')}
                     {h.memo ? ` · ${h.memo}` : ''}
                   </span>
                 </span>

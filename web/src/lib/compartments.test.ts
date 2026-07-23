@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { childCompartments, descendantIds } from './compartments'
+import { childCompartments, descendantIds, compartmentPath } from './compartments'
 
 // 서랍장 > 위/아래, 아래 > 아래-앞/아래-뒤
 const cmps = [
@@ -18,5 +18,10 @@ describe('compartments tree', () => {
   it('descendantIds: 자기 + 모든 후손', () => {
     expect(descendantIds(cmps, 'bot').sort()).toEqual(['bb', 'bf', 'bot'])
     expect(descendantIds(cmps, 'top')).toEqual(['top'])
+  })
+  it('compartmentPath: 루트→자기 경로(순환 안전)', () => {
+    expect(compartmentPath(cmps, 'bf').map((c) => c.name)).toEqual(['아래', '아래-앞'])
+    expect(compartmentPath(cmps, 'top').map((c) => c.name)).toEqual(['위'])
+    expect(compartmentPath(cmps, null)).toEqual([])
   })
 })
