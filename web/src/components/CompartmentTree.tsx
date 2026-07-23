@@ -120,7 +120,7 @@ export function InlineAddForm({ depth, onAddCompartment, onAddItem, onCancel }: 
   )
 }
 
-function ItemRow({ item, photoUrl, depth, onDelete }: {
+export function ItemRow({ item, photoUrl, depth, onDelete }: {
   item: DecItem; photoUrl?: string; depth: number; onDelete: (i: DecItem) => void
 }) {
   return (

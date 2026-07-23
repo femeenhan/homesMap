@@ -17,6 +17,7 @@ type Props = {
   deleteMessage: string
   onDelete: () => void
   levelClass?: string
+  chevron?: boolean
 }
 
 const pad = (d: number) => ({ paddingLeft: d * 14 + 6 })
@@ -24,7 +25,7 @@ const pad = (d: number) => ({ paddingLeft: d * 14 + 6 })
 // 방/수납장/칸 공용 행. 탭=펼치기, 이름수정은 ⋯메뉴로만(탭으로 편집 안 됨). 추가는 각 레벨 상단 AddRow가 담당.
 export function TreeRow({
   depth, icon, name, count, expandable, expanded, onToggle,
-  onRename, deleteTitle, deleteMessage, onDelete, levelClass = '',
+  onRename, deleteTitle, deleteMessage, onDelete, levelClass = '', chevron,
 }: Props) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(name)
@@ -66,12 +67,13 @@ export function TreeRow({
           <RowMenu onEditName={startEdit} onDelete={onDelete} deleteTitle={deleteTitle} deleteMessage={deleteMessage} />
         </span>
       )}
+      {!editing && chevron && <Icon name="chevron-right" size={16} className="trow-chev" />}
     </div>
   )
 }
 
 // ⋯ 메뉴: 이름 수정 / 삭제. 시트(.sheet) 재사용, 삭제는 Modal 확인.
-function RowMenu({ onEditName, onDelete, deleteTitle, deleteMessage }: {
+export function RowMenu({ onEditName, onDelete, deleteTitle, deleteMessage }: {
   onEditName: () => void; onDelete: () => void; deleteTitle: string; deleteMessage: string
 }) {
   const [open, setOpen] = useState(false)

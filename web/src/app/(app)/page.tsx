@@ -15,6 +15,8 @@ import { MapCanvas } from '@/components/MapCanvas'
 import { DetailPanel } from '@/components/DetailPanel'
 import { RoomDetail } from '@/components/RoomDetail'
 import { HomeTree } from '@/components/HomeTree'
+import { DrillDown } from '@/components/DrillDown'
+import { useIsMobile } from '@/lib/useIsMobile'
 import type { Room, Storage, Item, DecItem, FamilyMember, Activity, ItemDraft, Compartment } from '@/lib/types'
 import { recomputeChildStorages } from '@/lib/geometry'
 import { descendantIds } from '@/lib/compartments'
@@ -37,6 +39,7 @@ export default function AppHomePage() {
   const [data, setData] = useState<BootData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<'list' | 'map'>('list') // 목록(카테고리 트리)이 기본, 도식화(지도)는 보조
+  const isMobile = useIsMobile()
   const [showActivity, setShowActivity] = useState(false)
   // 선택은 수납장/방 중 하나만 — 물건 드로어와 방 드로어가 배타적으로 열린다.
   const [selectedStorageId, setSelectedStorageId] = useState<string | null>(null)
@@ -654,6 +657,20 @@ export default function AppHomePage() {
   const selectedRoom = data.rooms.find((r) => r.id === selectedRoomId)
   const selectedRoomStorageCount = selectedRoom ? data.storages.filter((s) => s.room_id === selectedRoom.id).length : 0
 
+  const treeProps = {
+    rooms: data.rooms, storages: data.storages, decItems: data.decItems, members: data.members,
+    onAddRoom: handleAddRoom,
+    onRenameRoom: (room: Room, name: string) => handleRoomUpdateMeta(room, { name }),
+    onDeleteRoom: handleRoomDelete,
+    onAddStorage: handleAddStorageInList,
+    onRenameStorage: handleStorageRename,
+    onDeleteStorage: handleStorageDelete,
+    onCompartmentsChange: handleCompartmentsChange,
+    onDeleteCompartment: handleCompartmentDelete,
+    onAddItem: handleTreeItemAdd,
+    onDeleteItem: handleItemDelete,
+  }
+
   return (
     <>
       <Header
@@ -679,22 +696,7 @@ export default function AppHomePage() {
       </div>
       {view === 'list' ? (
         <div className="tree-view">
-          <HomeTree
-            rooms={data.rooms}
-            storages={data.storages}
-            decItems={data.decItems}
-            members={data.members}
-            onAddRoom={handleAddRoom}
-            onRenameRoom={(room, name) => handleRoomUpdateMeta(room, { name })}
-            onDeleteRoom={handleRoomDelete}
-            onAddStorage={handleAddStorageInList}
-            onRenameStorage={handleStorageRename}
-            onDeleteStorage={handleStorageDelete}
-            onCompartmentsChange={handleCompartmentsChange}
-            onDeleteCompartment={handleCompartmentDelete}
-            onAddItem={handleTreeItemAdd}
-            onDeleteItem={handleItemDelete}
-          />
+          {isMobile ? <DrillDown {...treeProps} /> : <HomeTree {...treeProps} />}
         </div>
       ) : (
         <div className="main">

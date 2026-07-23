@@ -100,3 +100,5 @@ function TreeStorage({ storage, ...p }: { storage: Storage; room: Room } & Props
     </div>
   )
 }
+
+export type HomeTreeProps = Props

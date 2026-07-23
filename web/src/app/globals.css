@@ -375,6 +375,16 @@ header{
 .taddx-row{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
 .taddx-more{align-self:flex-start;font-size:12px;font-weight:600;color:var(--accent-ink);padding:4px 2px}
 
+/* ---------- 모바일 드릴다운 ---------- */
+.drill-head{display:flex;align-items:center;gap:6px;min-height:48px;padding:0 2px}
+.drill-back{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;color:var(--ink-soft);flex-shrink:0}
+.drill-back:active{background:var(--panel)}
+.drill-title{flex:1;min-width:0;font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drill-head .trow-name-input{flex:1;font-size:17px;font-weight:600}
+.trow.lv-drill{min-height:48px}
+.lv-drill .trow-caret{display:none}
+.trow-chev{color:var(--ink-soft);flex-shrink:0}
+
 /* 드로어(도식화) 상단 칸/물건 추가 · 최하단 방 추가 */
 .dp-actions{display:flex;gap:4px;padding:2px 4px 6px}
 .dp-form{border-top:1px solid var(--line);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
