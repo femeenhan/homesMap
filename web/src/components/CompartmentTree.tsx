@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { Storage, DecItem, FamilyMember, Compartment } from '@/lib/types'
 import { childCompartments } from '@/lib/compartments'
 import { TreeRow } from './TreeRow'
+import { Icon } from './Icon'
 
 type AddDraft = { name: string; memo: string; photoFile?: File }
 const pad = (d: number) => ({ paddingLeft: d * 14 + 6 }) // TreeRow와 동일 들여쓰기(스펙 §12 16→14) — 행/자식 폼·아이템 정렬 일치
@@ -19,7 +20,7 @@ export function DeleteBtn({ title, onConfirm }: { title: string; onConfirm: () =
       </span>
     )
   }
-  return <button type="button" className="trow-del" title={title} onClick={() => setConfirming(true)}>🗑️</button>
+  return <button type="button" className="trow-del" title={title} onClick={() => setConfirming(true)}><Icon name="trash" size={15} /></button>
 }
 
 // 이름 하나 받는 인라인 폼(칸·수납장·방 추가 공용)
@@ -57,7 +58,7 @@ export function InlineItemForm({ depth, onSubmit, onCancel }: {
       <input autoFocus type="text" placeholder="물건 이름" maxLength={30} value={name}
         onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') onCancel() }} />
       <input type="text" placeholder="메모 (선택)" maxLength={40} value={memo} onChange={(e) => setMemo(e.target.value)} />
-      <label className={`tadd-photo${photo ? ' has' : ''}`}>{photo ? '✅ 사진' : '📷'}
+      <label className={`tadd-photo${photo ? ' has' : ''}`}>{photo ? <><Icon name="check" size={13} /> 사진</> : <><Icon name="camera" size={13} /> 사진</>}
         <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
       </label>
       <button type="submit" disabled={!name.trim() || busy}>등록</button>
@@ -96,8 +97,8 @@ export function InlineAddForm({ depth, onAddCompartment, onAddItem, onCancel }: 
       }}
     >
       <div className="taddx-kind">
-        <button type="button" className={kind === 'cmp' ? 'on' : ''} aria-pressed={kind === 'cmp'} onClick={() => setKind('cmp')}>📁 칸</button>
-        <button type="button" className={kind === 'item' ? 'on' : ''} aria-pressed={kind === 'item'} onClick={() => setKind('item')}>📦 물건</button>
+        <button type="button" className={kind === 'cmp' ? 'on' : ''} aria-pressed={kind === 'cmp'} onClick={() => setKind('cmp')}>칸</button>
+        <button type="button" className={kind === 'item' ? 'on' : ''} aria-pressed={kind === 'item'} onClick={() => setKind('item')}>물건</button>
       </div>
       <div className="taddx-row">
         <input autoFocus type="text" placeholder={kind === 'cmp' ? '칸 이름' : '물건 이름'} maxLength={kind === 'cmp' ? 20 : 30}
@@ -108,7 +109,7 @@ export function InlineAddForm({ depth, onAddCompartment, onAddItem, onCancel }: 
       {kind === 'item' && (details ? (
         <div className="taddx-row">
           <input type="text" placeholder="메모 (선택)" maxLength={40} value={memo} onChange={(e) => setMemo(e.target.value)} />
-          <label className={`tadd-photo${photo ? ' has' : ''}`}>{photo ? '✅ 사진' : '📷'}
+          <label className={`tadd-photo${photo ? ' has' : ''}`}>{photo ? <><Icon name="check" size={13} /> 사진</> : <><Icon name="camera" size={13} /> 사진</>}
             <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
           </label>
         </div>
@@ -128,9 +129,10 @@ function ItemRow({ item, photoUrl, depth, onDelete }: {
         {photoUrl
           // eslint-disable-next-line @next/next/no-img-element -- blob: objectURL
           ? <img src={photoUrl} alt="" />
-          : (item.emoji || '📦')}
+          : <Icon name="box" size={13} />}
       </span>
-      <span className="titem-name">{item.name}{item.photo_path && !photoUrl ? ' 📷' : ''}</span>
+      <span className="titem-name">{item.name}</span>
+      {item.photo_path && !photoUrl && <Icon name="camera" size={12} className="titem-cam" />}
       {item.memo && <span className="titem-memo">{item.memo}</span>}
       <DeleteBtn title="물건 삭제" onConfirm={() => onDelete(item)} />
     </div>
@@ -206,7 +208,7 @@ function CompartmentNode(p: NodeProps) {
   return (
     <div className="tnode">
       <TreeRow
-        depth={p.depth} icon="📁" name={p.compartment.name} count={myItems.length}
+        depth={p.depth} icon="folder" name={p.compartment.name} count={myItems.length}
         expandable={hasKids}
         expanded={expanded} onToggle={() => setExpanded((e) => !e)}
         onRename={(n) => p.onRename(p.compartment.id, n)}

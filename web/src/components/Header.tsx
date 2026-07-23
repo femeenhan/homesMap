@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createInviteLink } from '@/lib/keys'
 import type { DecItem, FamilyMember, Room, Storage } from '@/lib/types'
 import { SearchBar } from './SearchBar'
+import { Icon } from './Icon'
 
 type Props = {
   familyId: string
@@ -42,7 +43,6 @@ export function Header({ familyId, members, decItems, storages, rooms, onToast, 
     <>
       <header>
         <div className="logo">
-          <span className="mark">🔍🏠</span>
           <h1>홈즈맵</h1>
           <span className="en">HOMES MAP</span>
         </div>
@@ -57,10 +57,10 @@ export function Header({ familyId, members, decItems, storages, rooms, onToast, 
           ))}
         </div>
         <button type="button" className="hdr-icon-btn" onClick={onActivityClick} title="가족 활동" aria-label="가족 활동">
-          🕘
+          <Icon name="clock" size={20} />
         </button>
         <button type="button" className="invite-btn" onClick={handleInvite} disabled={inviting}>
-          👨‍👩‍👧 가족 초대
+          가족 초대
         </button>
       </header>
       {fallbackLink && (

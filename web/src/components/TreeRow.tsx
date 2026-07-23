@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import { Modal } from './Modal'
+import { Icon, type IconName } from './Icon'
 
 type Props = {
   depth: number
-  icon: string
+  icon: IconName
   name: string
   count: number
   expandable: boolean
@@ -38,12 +39,12 @@ export function TreeRow({
   return (
     <div className={`trow ${levelClass}`.trim()} style={pad(depth)} onClick={editing ? undefined : onToggle}>
       {expandable ? (
-        <button type="button" className="trow-caret" aria-label={expanded ? '접기' : '펼치기'} aria-expanded={expanded}
-          onClick={(e) => { e.stopPropagation(); onToggle() }}>{expanded ? '▾' : '▸'}</button>
+        <button type="button" className={`trow-caret${expanded ? ' open' : ''}`} aria-label={expanded ? '접기' : '펼치기'} aria-expanded={expanded}
+          onClick={(e) => { e.stopPropagation(); onToggle() }}><Icon name="chevron-right" size={12} /></button>
       ) : (
         <span className="trow-caret" aria-hidden="true" />
       )}
-      <span className="trow-ico">{icon}</span>
+      <span className="trow-ico"><Icon name={icon} size={16} /></span>
       {editing ? (
         <input
           className="trow-name-input" type="text" autoFocus aria-label="이름 수정"
@@ -77,12 +78,12 @@ function RowMenu({ onEditName, onDelete, deleteTitle, deleteMessage }: {
   const [confirming, setConfirming] = useState(false)
   return (
     <>
-      <button type="button" className="trow-iconbtn" aria-label="메뉴" onClick={() => setOpen(true)}>⋯</button>
+      <button type="button" className="trow-iconbtn" aria-label="메뉴" onClick={() => setOpen(true)}><Icon name="more-horizontal" size={16} /></button>
       {open && (
         <div className="sheet-wrap" onClick={() => setOpen(false)}>
           <div className="sheet rowmenu" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="rowmenu-item" onClick={() => { setOpen(false); onEditName() }}>✏️ 이름 수정</button>
-            <button type="button" className="rowmenu-item danger" onClick={() => { setOpen(false); setConfirming(true) }}>🗑️ 삭제</button>
+            <button type="button" className="rowmenu-item" onClick={() => { setOpen(false); onEditName() }}>이름 수정</button>
+            <button type="button" className="rowmenu-item danger" onClick={() => { setOpen(false); setConfirming(true) }}>삭제</button>
             <button type="button" className="rowmenu-item cancel" onClick={() => setOpen(false)}>취소</button>
           </div>
         </div>

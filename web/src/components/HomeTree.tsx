@@ -45,7 +45,7 @@ function TreeRoom({ room, ...p }: { room: Room } & Props) {
   return (
     <div className="tnode">
       <TreeRow
-        depth={0} levelClass="lv-room" icon="🏠" name={room.name} count={storages.length}
+        depth={0} levelClass="lv-room" icon="folder" name={room.name} count={storages.length}
         expandable={storages.length > 0}
         expanded={expanded} onToggle={() => setExpanded((e) => !e)}
         onRename={(n) => p.onRenameRoom(room, n)}
@@ -73,7 +73,7 @@ function TreeStorage({ storage, ...p }: { storage: Storage; room: Room } & Props
   return (
     <div className="tnode">
       <TreeRow
-        depth={1} levelClass="lv-storage" icon="📦" name={storage.name} count={items.length}
+        depth={1} levelClass="lv-storage" icon="folder" name={storage.name} count={items.length}
         expandable={hasKids}
         expanded={expanded} onToggle={() => setExpanded((e) => !e)}
         onRename={(n) => p.onRenameStorage(storage, n)}

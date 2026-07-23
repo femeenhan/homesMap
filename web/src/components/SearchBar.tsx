@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { searchItems } from '@/lib/search'
 import type { DecItem, Storage, Room } from '@/lib/types'
+import { Icon } from './Icon'
 
 type Props = {
   decItems: DecItem[]
@@ -37,7 +38,7 @@ export function SearchBar({ decItems, storages, rooms, onPick }: Props) {
 
   return (
     <div className="search-wrap" ref={wrapRef}>
-      <span className="icon">🔎</span>
+      <span className="icon"><Icon name="search" size={16} /></span>
       <input
         ref={inputRef}
         className="search-input"
@@ -58,12 +59,12 @@ export function SearchBar({ decItems, storages, rooms, onPick }: Props) {
           {hits.length > 0 ? (
             hits.map((h) => (
               <button key={h.itemId} type="button" className="sr-item" onClick={() => pick(h.storageId)}>
-                <span className="sr-thumb">{itemById.get(h.itemId)?.emoji || '📦'}</span>
+                <span className="sr-thumb"><Icon name="box" size={16} /></span>
                 <span>
                   <span className="sr-name">{itemById.get(h.itemId)?.name ?? ''}</span>
                   <br />
                   <span className="sr-loc">
-                    📍 {h.pathNames.join(' › ')}
+                    {h.pathNames.join(' › ')}
                     {h.memo ? ` · ${h.memo}` : ''}
                   </span>
                 </span>
@@ -71,7 +72,7 @@ export function SearchBar({ decItems, storages, rooms, onPick }: Props) {
             ))
           ) : (
             <div className="sr-empty">
-              {`'${query.trim()}' 검색 결과가 없어요 😅`}
+              {`'${query.trim()}' 검색 결과가 없어요`}
               <br />
               수납장을 클릭해 등록해두면 다음엔 바로 찾아요!
             </div>

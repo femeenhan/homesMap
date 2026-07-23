@@ -671,11 +671,11 @@ export default function AppHomePage() {
         <div className="offline-notice">일부 물건({data.skippedCount}개)을 해독하지 못해 표시하지 않았어요.</div>
       )}
       {GUEST_MODE && data.userId === GUEST_USER_ID && (
-        <div className="offline-notice">🧪 테스트(게스트) 모드 · 로그인 없이 사용 중 — 데이터는 이 기기에만 저장돼요</div>
+        <div className="offline-notice">테스트(게스트) 모드 · 로그인 없이 사용 중 — 데이터는 이 기기에만 저장돼요</div>
       )}
       <div className="viewtabs">
-        <button type="button" className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>📋 목록</button>
-        <button type="button" className={view === 'map' ? 'active' : ''} onClick={() => setView('map')}>🗺️ 도식화</button>
+        <button type="button" className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>목록</button>
+        <button type="button" className={view === 'map' ? 'active' : ''} onClick={() => setView('map')}>도식화</button>
       </div>
       {view === 'list' ? (
         <div className="tree-view">
