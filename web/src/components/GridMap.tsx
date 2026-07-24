@@ -79,7 +79,7 @@ function HomeCanvas({ p, editing, onToggleEditing, onOpenStorage, onEditRoom }: 
           {editing ? '완료' : '편집'}
         </button>
       </div>
-      {editing && <div className="gmap-hint">방을 한 번 더 탭하면 확대해서 수납장을 편집할 수 있어요</div>}
+      {editing && <div className="gmap-hint">수납장은 바로 드래그해서 옮기고, 방을 한 번 더 탭하면 확대 편집할 수 있어요</div>}
       <div className="gmap-scroll" ref={wrapRef}>
         {cell > 0 && (
           <div className="gmap" style={{ height: rows * cell, backgroundSize: `${cell}px ${cell}px` }}>
@@ -99,13 +99,25 @@ function HomeCanvas({ p, editing, onToggleEditing, onOpenStorage, onEditRoom }: 
                   {/* 수납장 오버레이 — 방-로컬 셀을 방 사각형에 %-비례 배치 */}
                   {roomStorages.map((s) => {
                     const r = storageRect(s)
+                    if (editing) {
+                      const cw = (room.w * cell) / inner.cols   // 방-로컬 가로 셀(px)
+                      const chh = (room.h * cell) / inner.rows  // 방-로컬 세로 셀(px)
+                      return (
+                        <EditableTile key={s.id} rect={r}
+                          cell={cw} cellH={chh} cols={inner.cols} minW={1} minH={1} maxRows={inner.rows}
+                          editing selected={selectedId === s.id}
+                          className="gm-sto"
+                          onSelect={() => setSelectedId(s.id)}
+                          onCommit={(next) => p.onStorageGeometry(s, next)}>
+                          <span>{s.name}</span>
+                        </EditableTile>
+                      )
+                    }
                     const st = {
                       left: `${(r.x / inner.cols) * 100}%`, top: `${(r.y / inner.rows) * 100}%`,
                       width: `${(r.w / inner.cols) * 100}%`, height: `${(r.h / inner.rows) * 100}%`,
                     }
-                    return editing ? (
-                      <div key={s.id} className="gm-sto" style={st}><span>{s.name}</span></div>
-                    ) : (
+                    return (
                       <button key={s.id} type="button" className="gm-sto" style={st}
                         onClick={(e) => { e.stopPropagation(); onOpenStorage(s.id) }}>
                         <span>{s.name}</span>
@@ -202,12 +214,13 @@ function StorageScreen({ p, storage, flash, onBack }: {
 // 편집 가능 타일: 편집=드래그 이동(셀 스냅)·선택 후 코너 핸들 리사이즈.
 // 보기 모드에선 정적 컨테이너(내부 수납장 버튼이 인터랙션 담당 — 탑뷰 방 탭은 무동작).
 // 세로는 탑뷰=아래 무제한(행 확장), 방 확대=maxRows로 방 안 클램프.
-function EditableTile({ rect, cell, cols, minW, minH, maxRows, editing, selected, className, onSelect, onCommit, children }: {
-  rect: CellRect; cell: number; cols: number; minW: number; minH: number; maxRows?: number
+function EditableTile({ rect, cell, cellH, cols, minW, minH, maxRows, editing, selected, className, onSelect, onCommit, children }: {
+  rect: CellRect; cell: number; cellH?: number; cols: number; minW: number; minH: number; maxRows?: number
   editing: boolean; selected: boolean; className: string
   onSelect: () => void; onCommit: (next: CellRect) => void
   children: React.ReactNode
 }) {
+  const ch = cellH ?? cell
   const [drag, setDrag] = useState<{ mode: 'move' | 'resize'; sx: number; sy: number; cur: CellRect } | null>(null)
   const moved = useRef(false)
   const shown = drag?.cur ?? rect
@@ -228,7 +241,7 @@ function EditableTile({ rect, cell, cols, minW, minH, maxRows, editing, selected
     e.stopPropagation()
     if (!drag) return
     const dx = Math.round((e.clientX - drag.sx) / cell)
-    const dy = Math.round((e.clientY - drag.sy) / cell)
+    const dy = Math.round((e.clientY - drag.sy) / ch)
     if (dx !== 0 || dy !== 0) moved.current = true
     setDrag({
       ...drag,
@@ -251,10 +264,11 @@ function EditableTile({ rect, cell, cols, minW, minH, maxRows, editing, selected
 
   return (
     <div className={`${className}${editing ? ' gm-edit' : ''}${selected ? ' gm-selected' : ''}`}
-      style={{ left: shown.x * cell, top: shown.y * cell, width: shown.w * cell, height: shown.h * cell }}
+      style={{ left: shown.x * cell, top: shown.y * ch, width: shown.w * cell, height: shown.h * ch }}
       role={editing ? 'button' : undefined} tabIndex={editing ? 0 : undefined}
       onPointerDown={(e) => start('move', e)} onPointerMove={move} onPointerUp={end} onPointerCancel={() => setDrag(null)}
-      onClick={() => {
+      onClick={(e) => {
+        e.stopPropagation()
         if (moved.current) { moved.current = false; return }
         if (editing) onSelect()
       }}

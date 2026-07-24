@@ -244,7 +244,6 @@ header{
 }
 .gm-sto span{font-size:10.5px;font-weight:600;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gm-sto:hover{border-color:var(--accent)}
-.gm-edit .gm-sto{pointer-events:none}
 /* 검색 점프 하이라이트 */
 @keyframes gm-focus{0%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
 .gm-focus .gmap-scroll{animation:gm-focus 1.6s ease-out}
