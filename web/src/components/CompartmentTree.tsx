@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { Storage, DecItem, FamilyMember, Compartment } from '@/lib/types'
 import { childCompartments } from '@/lib/compartments'
 import { TreeRow } from './TreeRow'
@@ -85,6 +85,9 @@ export function InlineAddForm({ depth, onAddCompartment, onAddItem, onCancel }: 
   const [photo, setPhoto] = useState<File | null>(null)
   const [details, setDetails] = useState(false)
   const [busy, setBusy] = useState(false)
+  const nameRef = useRef<HTMLInputElement>(null)
+  // 토글 탭 = 입력 밖 터치라 입력이 블러됨(키보드 내려감) → 같은 제스처 안에서 재포커스
+  const pickKind = (k: 'cmp' | 'item') => { setKind(k); nameRef.current?.focus() }
   return (
     <form className="tadd-form taddx" style={pad(depth)}
       onSubmit={async (e) => {
@@ -97,11 +100,11 @@ export function InlineAddForm({ depth, onAddCompartment, onAddItem, onCancel }: 
       }}
     >
       <div className="taddx-kind">
-        <button type="button" className={kind === 'cmp' ? 'on' : ''} aria-pressed={kind === 'cmp'} onClick={() => setKind('cmp')}>칸 추가</button>
-        <button type="button" className={kind === 'item' ? 'on' : ''} aria-pressed={kind === 'item'} onClick={() => setKind('item')}>물건 추가</button>
+        <button type="button" className={kind === 'cmp' ? 'on' : ''} aria-pressed={kind === 'cmp'} onClick={() => pickKind('cmp')}>칸 추가</button>
+        <button type="button" className={kind === 'item' ? 'on' : ''} aria-pressed={kind === 'item'} onClick={() => pickKind('item')}>물건 추가</button>
       </div>
       <div className="taddx-row">
-        <input autoFocus type="text" placeholder={kind === 'cmp' ? '칸 이름' : '물건 이름'} maxLength={kind === 'cmp' ? 20 : 30}
+        <input ref={nameRef} autoFocus type="text" placeholder={kind === 'cmp' ? '칸 이름' : '물건 이름'} maxLength={kind === 'cmp' ? 20 : 30}
           value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') onCancel() }} />
         <button type="submit" disabled={!name.trim() || busy}>추가</button>
         <button type="button" className="btn-ghost" onClick={onCancel}>취소</button>
