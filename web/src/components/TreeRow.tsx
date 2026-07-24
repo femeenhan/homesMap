@@ -18,15 +18,16 @@ type Props = {
   onDelete: () => void
   levelClass?: string
   chevron?: boolean
-  onAdd?: () => void // 행 인라인 ＋(이 레벨의 유일한 추가 동작이 있을 때 — 예: 방→수납장)
+  addActions?: { icon: IconName; label: string; onClick: () => void }[] // 행 인라인 추가 버튼들(이 레벨에서 바로 추가 가능한 동작 — 예: 방→수납장/칸)
+  onDuplicate?: () => void
 }
 
 const pad = (d: number) => ({ paddingLeft: d * 14 + 6 })
 
-// 방/수납장/칸 공용 행. 탭=펼치기, 이름수정은 ⋯메뉴로만(탭으로 편집 안 됨). 추가는 onAdd(행 인라인 ＋) 또는 화면 단위 AddRow가 담당.
+// 방/수납장/칸 공용 행. 탭=펼치기, 이름수정은 ⋯메뉴로만(탭으로 편집 안 됨). 추가는 addActions(행 인라인 버튼) 또는 화면 단위 AddRow가 담당.
 export function TreeRow({
   depth, icon, name, count, expandable, expanded, onToggle,
-  onRename, deleteTitle, deleteMessage, onDelete, levelClass = '', onAdd, chevron,
+  onRename, deleteTitle, deleteMessage, onDelete, levelClass = '', addActions, onDuplicate, chevron,
 }: Props) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(name)
@@ -65,12 +66,12 @@ export function TreeRow({
       {!editing && count > 0 && <span className="trow-meta">{count}</span>}
       {!editing && (
         <span className="trow-actions" onClick={(e) => e.stopPropagation()}>
-          {onAdd && (
-            <button type="button" className="trow-iconbtn" aria-label="추가" onClick={onAdd}>
-              <Icon name="plus" size={16} />
+          {addActions?.map((a) => (
+            <button key={a.label} type="button" className="trow-iconbtn" aria-label={a.label} title={a.label} onClick={a.onClick}>
+              <Icon name={a.icon} size={16} />
             </button>
-          )}
-          <RowMenu onEditName={startEdit} onDelete={onDelete} deleteTitle={deleteTitle} deleteMessage={deleteMessage} />
+          ))}
+          <RowMenu onEditName={startEdit} onDelete={onDelete} deleteTitle={deleteTitle} deleteMessage={deleteMessage} onDuplicate={onDuplicate} />
         </span>
       )}
       {!editing && chevron && <Icon name="chevron-right" size={16} className="trow-chev" />}
@@ -78,9 +79,9 @@ export function TreeRow({
   )
 }
 
-// ⋯ 메뉴: 이름 수정 / 삭제. 시트(.sheet) 재사용, 삭제는 Modal 확인.
-export function RowMenu({ onEditName, onDelete, deleteTitle, deleteMessage }: {
-  onEditName: () => void; onDelete: () => void; deleteTitle: string; deleteMessage: string
+// ⋯ 메뉴: 이름 수정 / (있으면) 복사 / 삭제. 시트(.sheet) 재사용, 삭제는 Modal 확인.
+export function RowMenu({ onEditName, onDuplicate, onDelete, deleteTitle, deleteMessage }: {
+  onEditName: () => void; onDuplicate?: () => void; onDelete: () => void; deleteTitle: string; deleteMessage: string
 }) {
   const [open, setOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -92,6 +93,9 @@ export function RowMenu({ onEditName, onDelete, deleteTitle, deleteMessage }: {
           <div className="sheet rowmenu" onClick={(e) => e.stopPropagation()}>
             <div className="rowmenu-group">
               <button type="button" className="rowmenu-item" onClick={() => { setOpen(false); onEditName() }}>이름 수정</button>
+              {onDuplicate && (
+                <button type="button" className="rowmenu-item" onClick={() => { setOpen(false); onDuplicate() }}>복사</button>
+              )}
               <button type="button" className="rowmenu-item danger" onClick={() => { setOpen(false); setConfirming(true) }}>삭제</button>
             </div>
             <button type="button" className="rowmenu-item cancel" onClick={() => setOpen(false)}>취소</button>
