@@ -246,7 +246,18 @@ header{
 .gm-sto:hover{border-color:var(--accent)}
 /* 검색 점프 하이라이트 */
 @keyframes gm-focus{0%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
-.gm-focus .gmap-scroll{animation:gm-focus 1.6s ease-out}
+.gm-focus .gmap-scroll,.gm-focus .sp-right{animation:gm-focus 1.6s ease-out}
+
+/* 수납장 화면 2-pane: 좌=칸 트리 / 우=선택 칸 물건 */
+.sp-panes{flex:1;min-height:0;display:flex;gap:12px}
+.sp-left{width:40%;min-width:150px;max-width:280px;overflow-y:auto;border-right:1px solid var(--line);padding-right:8px;display:flex;flex-direction:column}
+.sp-right{flex:1;min-width:0;overflow-y:auto;display:flex;flex-direction:column}
+.sp-root{display:flex;align-items:center;gap:6px;min-height:40px;padding:0 6px;border-radius:7px;text-align:left}
+.sp-root:hover{background:var(--panel)}
+.trow.sel,.sp-root.sel{background:var(--accent-soft)}
+.trow.sel .trow-name{color:var(--accent-ink);font-weight:600}
+.sp-right-head{font-size:13px;font-weight:700;color:var(--ink-soft);padding:8px 6px 2px}
+.sp-items{display:flex;flex-direction:column}
 
 /* 편집 모드: 셀 스냅 드래그 이동 + 44px 코너 핸들 리사이즈 */
 .gmap-bar{display:flex;align-items:center;gap:8px}
