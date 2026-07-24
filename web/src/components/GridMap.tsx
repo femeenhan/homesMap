@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import type { Room, Storage } from '@/lib/types'
+import type { Compartment, Room, Storage } from '@/lib/types'
 import { COLS, type CellRect, contentRows, roomInnerGrid, storageRect } from '@/lib/grid'
 import { resolvePath, type PathSeg } from '@/lib/drillPath'
-import { AddRow, InlineInput } from './CompartmentTree'
+import { childCompartments, descendantIds } from '@/lib/compartments'
+import { AddRow, InlineAddForm, InlineInput, ItemRow } from './CompartmentTree'
 import { DrillHeader } from './DrillDown'
 import type { HomeTreeProps } from './HomeTree'
 
@@ -32,6 +33,7 @@ function useSize(ref: React.RefObject<HTMLDivElement | null>) {
 // 도식화: 사각형 드릴다운 맵. 경로 상태는 목록 드릴다운과 동일한 resolvePath로 검증.
 export function GridMap(p: GridMapProps) {
   const [path, setPath] = useState<PathSeg[]>([])
+  const [focusFlash, setFocusFlash] = useState(false)
   const valid = resolvePath(path, p.rooms, p.storages)
   const cur = valid[valid.length - 1]
   const toSegs = () => valid.map((v) => ({ kind: v.kind, id: v.id }) as PathSeg)
@@ -44,15 +46,24 @@ export function GridMap(p: GridMapProps) {
     const jump = () => {
       const s = p.storages.find((x) => x.id === p.focusStorageId)
       if (s) setPath([{ kind: 'room', id: s.room_id }, { kind: 'storage', id: s.id }])
+      setFocusFlash(true)
     }
     jump()
     p.onConsumeFocus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.focusStorageId])
 
+  useEffect(() => {
+    if (!focusFlash) return
+    const t = setTimeout(() => setFocusFlash(false), 1600)
+    return () => clearTimeout(t)
+  }, [focusFlash])
+
   if (!cur) return <HomeCanvas p={p} onEnter={enter} />
   if (cur.kind === 'room') return <RoomCanvas p={p} room={cur.room} onEnter={enter} onBack={back} />
-  return <div /> /* L2 자리표시 — Task 4가 StorageView로 교체 */
+  const storage = cur.storage
+  const parent = cur.kind === 'cmp' ? cur.cmp : null
+  return <StorageView p={p} storage={storage} parent={parent} onEnter={enter} onBack={back} flash={focusFlash} />
 }
 
 const px = (r: CellRect, cell: number) => ({
@@ -126,6 +137,65 @@ function RoomCanvas({ p, room, onEnter, onBack }: {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// L2+: 수납장/칸 확대 — 하위 칸 세로 스택(자동, 좌표 없음) + 물건 목록
+function StorageView({ p, storage, parent, onEnter, onBack, flash }: {
+  p: GridMapProps; storage: Storage; parent: Compartment | null
+  onEnter: (s: PathSeg) => void; onBack: () => void; flash: boolean
+}) {
+  const [adding, setAdding] = useState(false)
+  const compartments = storage.compartments ?? []
+  const children = childCompartments(compartments, parent?.id ?? null)
+  const validIds = new Set(compartments.map((c) => c.id))
+  const allItems = p.decItems.filter((it) => it.storage_id === storage.id)
+  const items = parent
+    ? allItems.filter((it) => it.compartment_id === parent.id)
+    : allItems.filter((it) => !it.compartment_id || !validIds.has(it.compartment_id))
+  const countIn = (cmpId: string) => {
+    const ids = new Set([cmpId, ...descendantIds(compartments, cmpId)])
+    return allItems.filter((it) => it.compartment_id != null && ids.has(it.compartment_id)).length
+  }
+  const head = parent
+    ? {
+        name: parent.name,
+        onRename: (n: string) => p.onCompartmentsChange(storage, compartments.map((c) => (c.id === parent.id ? { ...c, name: n } : c))),
+        deleteTitle: '칸 삭제', deleteMessage: `'${parent.name}' 칸과 그 안의 칸·물건이 함께 삭제됩니다`,
+        onDelete: () => p.onDeleteCompartment(storage, parent.id),
+      }
+    : {
+        name: storage.name,
+        onRename: (n: string) => p.onRenameStorage(storage, n),
+        deleteTitle: '수납장 삭제', deleteMessage: `'${storage.name}' 수납장과 그 안의 물건이 함께 삭제됩니다`,
+        onDelete: () => p.onDeleteStorage(storage),
+      }
+  return (
+    <div className={`gmap-page${flash ? ' gm-focus' : ''}`}>
+      <DrillHeader onBack={onBack} {...head} />
+      {adding
+        ? <InlineAddForm depth={0}
+            onAddCompartment={(n) => { p.onCompartmentsChange(storage, [...compartments, { id: crypto.randomUUID(), name: n, parent_id: parent?.id ?? null }]); setAdding(false) }}
+            onAddItem={async (d) => { await p.onAddItem(storage, parent?.id ?? null, d); setAdding(false) }}
+            onCancel={() => setAdding(false)} />
+        : <AddRow depth={0} label="추가" onClick={() => setAdding(true)} />}
+      <div className="gmap-scroll">
+        {children.length > 0 && (
+          <div className="gm-stack">
+            {children.map((c) => (
+              <button key={c.id} type="button" className="gm-block" onClick={() => onEnter({ kind: 'cmp', id: c.id })}>
+                <span className="gm-name">{c.name}</span>
+                {countIn(c.id) > 0 && <span className="gm-meta">{countIn(c.id)}</span>}
+              </button>
+            ))}
+          </div>
+        )}
+        {children.length === 0 && items.length === 0 && <div className="tree-empty">아직 비어 있어요.</div>}
+        <div className="gm-items">
+          {items.map((it) => <ItemRow key={it.id} item={it} depth={0} onDelete={p.onDeleteItem} />)}
+        </div>
       </div>
     </div>
   )

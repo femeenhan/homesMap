@@ -415,6 +415,17 @@ header{
 .gm-meta{font-size:11px;color:var(--ink-soft);flex-shrink:0}
 .gm-storage{background:var(--surface)}
 .gmap-foot{padding:8px 2px;font-size:12px;color:var(--ink-soft);text-align:center;flex-shrink:0}
+.gm-stack{display:flex;flex-direction:column;gap:8px;padding:2px 0 8px}
+.gm-block{
+  display:flex;align-items:center;justify-content:space-between;gap:6px;
+  min-height:56px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;
+  background:var(--panel);text-align:left;
+}
+.gm-block:hover{border-color:var(--accent)}
+.gm-items{display:flex;flex-direction:column}
+/* 검색 점프 하이라이트 */
+@keyframes gm-focus{0%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
+.gm-focus .gm-stack,.gm-focus .gm-items{animation:gm-focus 1.6s ease-out}
 
 /* 드로어(도식화) 상단 칸/물건 추가 · 최하단 방 추가 */
 .dp-actions{display:flex;gap:4px;padding:2px 4px 6px}
