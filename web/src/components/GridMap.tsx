@@ -66,9 +66,11 @@ function HomeCanvas({ p, editing, onToggleEditing, onOpenStorage, onEditRoom }: 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const { w, h } = useSize(wrapRef)
-  const cell = w / COLS
+  // 셀 = (폭 − 그리드 보더 2px)/12 — 12번째 칸이 보더 밖으로 밀리지 않게.
+  // 최소 행은 내림(floor) — 기본 상태는 화면을 꽉 채우되 스크롤바가 생기지 않고, 콘텐츠가 넘칠 때만 스크롤.
+  const cell = w > 0 ? (w - 2) / COLS : 0
   const rects = p.rooms.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h }))
-  const rows = cell > 0 ? contentRows(rects, Math.ceil(h / cell)) + (editing ? 3 : 0) : 0
+  const rows = cell > 0 ? contentRows(rects, Math.floor((h - 2) / cell)) + (editing ? 3 : 0) : 0
   return (
     <div className="gmap-page">
       <div className="gmap-bar">
@@ -145,7 +147,7 @@ function RoomEditView({ p, room, onBack }: { p: GridMapProps; room: Room; onBack
   const wrapRef = useRef<HTMLDivElement>(null)
   const { w } = useSize(wrapRef)
   const inner = roomInnerGrid(room)
-  const cell = w / inner.cols
+  const cell = w > 0 ? (w - 2) / inner.cols : 0 // 보더 2px 보정 — 우측 칸 잘림 방지
   const storages = p.storages.filter((s) => s.room_id === room.id)
   return (
     <div className="gmap-page">
