@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { keys } from '@/lib/keys'
 import { store } from '@/lib/store'
 import { syncNow, push } from '@/lib/sync'
@@ -38,6 +38,7 @@ export default function AppHomePage() {
   const [focusStorageId, setFocusStorageId] = useState<string | null>(null)
   const [searchFlash, setSearchFlash] = useState(false)
   const [storageClipboard, setStorageClipboard] = useState<Storage | null>(null) // 수납장 복사 스냅샷
+  const itemUpdateChain = useRef(Promise.resolve()) // 물건 수정 직렬화(같은 물건 연속 수정의 순서 보장)
   const [pendingImport, setPendingImport] = useState<Backup | null>(null)
   const [openItemId, setOpenItemId] = useState<string | null>(null)
   const { message: toastMsg, showToast } = useToast()
@@ -470,46 +471,55 @@ export default function AppHomePage() {
     }
   }
 
-  // 물건 수정: 이름/메모 재암호화, 사진 교체(File)/삭제(null)/유지(undefined). photoUrls·objectURL 정리 포함.
-  async function handleItemUpdate(item: DecItem, patch: { name?: string; memo?: string; photoFile?: File | null }) {
-    if (!data) return
+  // 물건 수정: 직렬화 체인 + 저장소 fresh 재조회 — blur 저장과 사진 버튼이 같은 제스처에서 겹쳐도
+  // 나중 작업이 앞 작업 결과 위에 적용된다(스테일 스냅샷으로 인한 편집 유실 방지, 최종 리뷰 I1).
+  function handleItemUpdate(item: DecItem, patch: { name?: string; memo?: string; photoFile?: File | null }) {
+    const run = () => applyItemUpdate(item.id, patch)
+    const next = itemUpdateChain.current.then(run, run)
+    itemUpdateChain.current = next
+    return next
+  }
+
+  async function applyItemUpdate(itemId: string, patch: { name?: string; memo?: string; photoFile?: File | null }) {
     const fdk = keys.getFDK()
     if (!fdk) return
+    const stored = (await store.allActive<Item>('items')).find((it) => it.id === itemId)
+    if (!stored) return
     const now = new Date().toISOString()
-    const name = patch.name ?? item.name
-    const memo = patch.memo ?? item.memo
-    let photo_path = item.photo_path
+    const name = patch.name ?? await decryptField(fdk, stored.enc_name)
+    const memo = patch.memo ?? (stored.enc_memo ? await decryptField(fdk, stored.enc_memo) : '')
+    let photo_path = stored.photo_path
     let newUrl: string | undefined
     if (patch.photoFile instanceof File) {
       const bytes = await downscaleImage(patch.photoFile)
       const blob = new Blob([bytes], { type: 'image/jpeg' })
-      await store.putPhoto(item.id, blob)
+      await store.putPhoto(itemId, blob)
       photo_path = 'local'
       newUrl = URL.createObjectURL(blob)
     } else if (patch.photoFile === null) {
-      await store.delPhoto(item.id)
+      await store.delPhoto(itemId)
       photo_path = null
     }
     const row: Item = {
-      id: item.id, family_id: item.family_id, storage_id: item.storage_id, compartment_id: item.compartment_id,
+      ...stored,
       enc_name: await encryptField(fdk, name),
       enc_memo: memo ? await encryptField(fdk, memo) : null,
-      emoji: item.emoji, photo_path, created_by: item.created_by,
-      created_at: item.created_at, updated_at: now, deleted_at: null,
+      photo_path,
+      updated_at: now,
     }
     await store.putLocal('items', row, { dirty: true })
     setData((d) => {
       if (!d) return d
       const photoUrls = { ...d.photoUrls }
       if (patch.photoFile === null || newUrl) {
-        const old = photoUrls[item.id]
+        const old = photoUrls[itemId]
         if (old) URL.revokeObjectURL(old)
-        delete photoUrls[item.id]
+        delete photoUrls[itemId]
       }
-      if (newUrl) photoUrls[item.id] = newUrl
+      if (newUrl) photoUrls[itemId] = newUrl
       return {
         ...d,
-        decItems: d.decItems.map((it) => (it.id === item.id ? { ...it, name, memo, photo_path, updated_at: now } : it)),
+        decItems: d.decItems.map((it) => (it.id === itemId ? { ...it, name, memo, photo_path, updated_at: now } : it)),
         photoUrls,
       }
     })
