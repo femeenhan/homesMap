@@ -31,15 +31,6 @@ export type Activity = { id: UUID; family_id: UUID; actor_id: UUID; kind: string
 export type Tool = 'none' | 'add-room' | 'add-storage'
 
 export type StorageTypeKey = 'drawer' | 'closet' | 'shelf' | 'fridge' | 'box' | 'shoe'
-// presets: '칸 추가' 시 원탭으로 만들 기본 칸 이름(전부 수정·추가 가능한 시작값)
-export const STORAGE_TYPES: { type: StorageTypeKey; em: string; label: string; presets: string[] }[] = [
-  { type: 'drawer', em: '🗄️', label: '서랍장', presets: ['윗서랍', '중간서랍', '아래서랍'] },
-  { type: 'closet', em: '🚪', label: '옷장',   presets: ['왼쪽', '가운데', '오른쪽'] },
-  { type: 'shelf',  em: '📚', label: '선반',   presets: ['1층', '2층', '3층'] },
-  { type: 'fridge', em: '🧊', label: '냉장고', presets: ['냉장실', '냉동실', '문칸'] },
-  { type: 'box',    em: '📦', label: '수납박스', presets: [] },
-  { type: 'shoe',   em: '👟', label: '신발장', presets: ['1단', '2단', '3단'] },
-]
 // Clay 브랜드 팔레트(피치·라벤더·민트·오커·코랄). 반투명 fill이라 라이트/다크 양쪽에서 tint로 동작,
 // border는 라벨 텍스트에도 쓰이므로 두 배경 모두에서 읽히는 중간 채도.
 export const ROOM_COLORS = [

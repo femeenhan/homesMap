@@ -238,7 +238,7 @@ export default function AppHomePage() {
   // 셋 다 같은 패턴: 로컬에 즉시 반영(로컬 우선) → 낙관적 화면 갱신 → push() 시도(오프라인이면 토스트만)
 
   // 드로어에서 방 이름/색 편집
-  async function handleRoomUpdateMeta(room: Room, patch: { name?: string; color_index?: number }) {
+  async function handleRoomUpdateMeta(room: Room, patch: { name?: string }) {
     if (!data) return
     const updated: Room = { ...room, ...patch, updated_at: new Date().toISOString() }
     await store.putLocal('rooms', updated, { dirty: true })

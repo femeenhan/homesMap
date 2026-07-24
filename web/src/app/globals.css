@@ -12,7 +12,6 @@
   --accent-ink:#1d4ed8;  /* accent-soft 위 텍스트(활성 탭·링크) */
   --danger:#dc2626;
   --grid:rgba(60,70,90,.06);     /* 맵 모눈선 */
-  --st-label-bg:rgba(255,255,255,.92);
   --hint-bg:#f7f7f8; --hint-line:#e4e4e7; --hint-ink:#6f7680;
   --green:#16a34a; --blue:#4a7fa5; --gold:#c9a227;
   --shadow:0 2px 10px rgba(0,0,0,.06);
@@ -33,7 +32,6 @@
     --accent-ink:#93b4f5;
     --danger:#ef6a6a;
     --grid:rgba(200,210,235,.05);
-    --st-label-bg:rgba(30,31,34,.92);
     --hint-bg:#1e1f22; --hint-line:#2c2e33; --hint-ink:#9aa0a6;
     --green:#4ade80;
     --shadow:0 4px 16px rgba(0,0,0,.4);
@@ -132,33 +130,7 @@ header{
 .main{flex:1;display:flex;min-height:0;position:relative} /* position:relative — 상세 패널 오버레이 드로어의 기준 */
 
 /* ---------- Toolbar ---------- */
-.toolbar{
-  width:218px;flex-shrink:0;background:var(--paper);border-right:1px solid var(--line);
-  padding:16px 14px;display:flex;flex-direction:column;gap:16px;overflow-y:auto;
-}
 .tb-title{font-size:11px;font-weight:800;color:var(--ink-soft);letter-spacing:1px;margin-bottom:8px}
-.mode-btn{
-  display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:11px;
-  font-size:14px;font-weight:600;color:var(--ink);border:1px solid transparent;margin-bottom:6px;
-  background:var(--panel);transition:all .12s;text-align:left;
-}
-.mode-btn .em{font-size:18px}
-.mode-btn:hover{background:var(--accent-soft)}
-.mode-btn.active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink)}
-.storage-palette{display:none;grid-template-columns:1fr 1fr;gap:6px}
-.storage-palette.open{display:grid}
-.pal-btn{
-  display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px;border-radius:10px;
-  background:var(--panel);font-size:11px;font-weight:600;color:var(--ink-soft);border:1px solid transparent;
-}
-.pal-btn .em{font-size:20px}
-.pal-btn:hover{background:var(--accent-soft)}
-.pal-btn.active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink)}
-
-.hint{
-  background:var(--hint-bg);border:1px solid var(--hint-line);border-radius:11px;padding:11px 12px;
-  font-size:12.5px;line-height:1.55;color:var(--hint-ink);
-}
 .activity{flex:1;min-height:0;display:flex;flex-direction:column}
 .activity-list{list-style:none;overflow-y:auto;display:flex;flex-direction:column;gap:7px}
 .activity-list li{
@@ -167,137 +139,6 @@ header{
 }
 .activity-list li b{color:var(--ink)}
 
-/* ---------- Map ---------- */
-.map-area{flex:1;display:flex;flex-direction:column;min-width:0;padding:18px}
-.map-scroll{flex:1;overflow:auto;border-radius:var(--radius);display:flex;align-items:center;justify-content:center}
-.map{
-  position:relative;width:940px;height:600px;
-  background:
-    repeating-linear-gradient(0deg,transparent 0 23px,var(--grid) 23px 24px),
-    repeating-linear-gradient(90deg,transparent 0 23px,var(--grid) 23px 24px),
-    var(--paper);
-  border:1px solid var(--line);border-radius:var(--radius);
-  box-shadow:inset 0 0 40px rgba(0,0,0,.04), var(--shadow);
-  cursor:default; user-select:none;
-  transform-origin:top left;
-}
-.map.tool-add-room{cursor:crosshair;touch-action:none}   /* 방 추가: 생성 드래그가 터치 스크롤에 안 뺏기게 */
-.map.tool-add-storage{cursor:copy}
-/* 추가 도구 사용 중엔 수납장이 밑의 방/배경 탭을 가로막지 않게 통과(방 잡기·수납장 배치·배경 탭이 뚫려야 함) */
-.map.tool-add-room .storage,.map.tool-add-storage .storage{pointer-events:none}
-/* 기본 상태: 방/수납장 직접조작(탭=선택·열기, 드래그=이동). 터치 드래그가 스크롤에 안 뺏기게 touch-action:none */
-.map:not(.tool-add-room):not(.tool-add-storage) .room{cursor:move;touch-action:none}
-.map:not(.tool-add-room):not(.tool-add-storage) .storage{cursor:move;touch-action:none}
-.map.empty::after{
-  content:"✏️  '방 추가'를 누르고 드래그해서 첫 번째 방을 만들어보세요";
-  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  color:var(--ink-soft);font-size:15px;pointer-events:none;
-}
-.room{
-  position:absolute;border-radius:10px;border:2.5px solid;
-  transition:box-shadow .2s;
-}
-.room .room-label{
-  position:absolute;top:6px;left:9px;font-size:12.5px;font-weight:800;opacity:.85;
-  display:flex;align-items:center;gap:5px;pointer-events:none;
-}
-.room.glow{box-shadow:0 0 0 4px rgba(37,99,235,.30)}
-.room.selected{box-shadow:0 0 0 3px rgba(37,99,235,.45)}
-.room-grip{
-  position:absolute;right:-7px;bottom:-7px;width:16px;height:16px;border-radius:4px;z-index:6;
-  background:var(--surface);border:2px solid var(--accent);cursor:se-resize;touch-action:none;box-shadow:var(--shadow);
-}
-.ghost{
-  position:absolute;border:2.5px dashed var(--accent);border-radius:10px;
-  background:rgba(37,99,235,.08);pointer-events:none;display:none;
-}
-.storage{
-  position:absolute;transform:translate(-50%,-50%);
-  display:flex;flex-direction:column;align-items:center;gap:2px;
-  background:none;padding:4px;border-radius:12px;z-index:5;
-}
-.storage .badge{
-  position:relative;width:44px;height:44px;border-radius:13px;background:var(--surface);
-  display:flex;align-items:center;justify-content:center;font-size:23px;
-  box-shadow:var(--shadow);border:1px solid var(--line);transition:transform .12s,border-color .12s;
-}
-.storage:hover .badge{transform:scale(1.12);border-color:var(--accent)}
-.storage .count{
-  position:absolute;top:-6px;right:-7px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;
-  background:var(--accent);color:#fff;font-size:11px;font-weight:800;
-  display:flex;align-items:center;justify-content:center;
-}
-.storage .st-label{
-  font-size:11px;font-weight:700;color:var(--ink);background:var(--st-label-bg);
-  padding:1px 7px;border-radius:8px;white-space:nowrap;
-}
-@keyframes pulse{
-  0%{box-shadow:0 0 0 0 rgba(37,99,235,.65)}
-  70%{box-shadow:0 0 0 22px rgba(37,99,235,0)}
-  100%{box-shadow:0 0 0 0 rgba(37,99,235,0)}
-}
-.storage.found .badge{border-color:var(--accent);animation:pulse 1.2s ease-out 3}
-.storage.selected .badge{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),var(--shadow)}
-.map-footer{
-  display:flex;justify-content:space-between;align-items:center;
-  padding:10px 4px 0;font-size:12.5px;color:var(--ink-soft);
-}
-
-/* ---------- Detail panel (오버레이 드로어) ---------- */
-/* in-flow에서 빼내 맵 위 오른쪽에 겹침 — 열어도 맵 폭을 뺏지 않는다. 비모달(백드롭 없음)이라 맵은 계속 조작 가능. */
-.detail-panel{
-  position:absolute;top:0;right:0;bottom:0;z-index:40;
-  width:min(320px,90vw);background:var(--paper);border-left:1px solid var(--line);
-  box-shadow:-6px 0 18px rgba(0,0,0,.08);
-  display:none;flex-direction:column;min-height:0;
-}
-.detail-panel.open{display:flex;animation:dp-slide-in .22s ease-out}
-@keyframes dp-slide-in{from{transform:translateX(100%)}to{transform:translateX(0)}}
-@media (prefers-reduced-motion:reduce){.detail-panel.open{animation:none}.trow-caret svg{transition:none}}
-/* 모바일: 우측 사이드 드로어 → 바텀시트. 지도는 위에 그대로 보이고, 높이는 내용만큼(최대 75dvh, 넘치면 dp-items가 스크롤). */
-@media (max-width:640px){
-  .detail-panel{
-    top:auto;left:0;right:0;bottom:0;width:auto;height:auto;max-height:75dvh;
-    border-left:none;border-top:1px solid var(--line);border-radius:12px 12px 0 0;
-    box-shadow:0 -6px 20px rgba(0,0,0,.12);
-  }
-  .detail-panel::before{ /* 그랩 핸들 — 시각 표시용(드래그 없음), 닫기는 ✕ */
-    content:'';flex:none;width:38px;height:4px;border-radius:2px;background:var(--line);margin:8px auto 0;
-  }
-  .detail-panel.open{animation:dp-slide-up .24s ease-out}
-}
-@keyframes dp-slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
-@media (max-width:640px) and (prefers-reduced-motion:reduce){.detail-panel.open{animation:none}}
-.dp-head{padding:16px 16px 12px;border-bottom:1px solid var(--line);position:relative}
-.dp-close{position:absolute;top:12px;right:12px;font-size:15px;color:var(--ink-soft);width:26px;height:26px;border-radius:50%}
-.dp-close:hover{background:var(--panel)}
-.dp-icon{font-size:30px}
-.dp-name{font-size:17px;font-weight:800;margin-top:2px}
-/* 방/수납장 이름 인라인 편집 — 헤드에서 바로 고칠 수 있게(밑줄만, 포커스 시 강조) */
-.dp-name-input{
-  width:100%;margin-top:2px;padding:2px 0;font-size:17px;font-weight:800;color:var(--ink);
-  border:none;border-bottom:1.5px solid transparent;background:transparent;outline:none;
-}
-.dp-name-input:focus{border-bottom-color:var(--accent)}
-.dp-loc{font-size:12.5px;color:var(--ink-soft);margin-top:2px}
-.dp-del{margin-top:8px;font-size:11.5px;color:var(--danger);text-decoration:underline;text-align:left}
-/* 방 드로어 본문 */
-.rd-body{padding:16px 14px;display:flex;flex-direction:column;gap:14px}
-.rd-field label{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:7px}
-.dp-items{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
-.item-card{
-  display:flex;align-items:center;gap:10px;background:var(--panel);
-  border-radius:11px;padding:8px 10px;
-}
-.item-thumb{width:44px;height:44px;border-radius:9px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:22px;overflow:hidden;flex-shrink:0;border:1px solid var(--line)}
-.item-thumb img{width:100%;height:100%;object-fit:cover}
-.item-body{flex:1;min-width:0}
-.item-name{font-weight:700;font-size:13.5px}
-.item-memo{font-size:11.5px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.item-by{font-size:10.5px;color:var(--ink-soft);margin-top:1px}
-.item-del{color:var(--ink-soft);font-size:13px;padding:4px}
-.item-del:hover{color:var(--danger)}
-.dp-empty{color:var(--ink-soft);font-size:12.5px;text-align:center;padding:18px 0}
 /* ---------- 뷰 토글 ---------- */
 .viewtabs{display:flex;gap:6px;padding:10px 16px;background:var(--paper);border-bottom:1px solid var(--line);flex-shrink:0}
 .viewtabs button{padding:7px 16px;border-radius:8px;font-size:13.5px;font-weight:700;background:var(--panel);color:var(--ink-soft);border:1px solid transparent}
@@ -316,6 +157,7 @@ header{
 .trow-caret{width:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--ink-soft);background:none;border:none;padding:0;cursor:pointer}
 .trow-caret svg{transition:transform .12s}
 .trow-caret.open svg{transform:rotate(90deg)}
+@media (prefers-reduced-motion:reduce){.trow-caret svg{transition:none}}
 .trow-ico{flex-shrink:0;display:flex;color:var(--ink-soft)}
 .trow-name{flex:1;min-width:0;font-size:14px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:none;background:transparent;border:none;outline:none;padding:0}
 .trow-name-input{flex:1;min-width:0;font-size:14px;color:var(--ink);background:var(--surface);border:none;outline:none;padding:4px 6px;border-radius:6px;box-shadow:0 0 0 1px var(--accent)}
@@ -439,26 +281,6 @@ header{
   display:flex;align-items:center;justify-content:center;
 }
 .gm-grip::after{content:'';width:20px;height:20px;border-radius:6px;background:var(--accent);box-shadow:var(--shadow)}
-
-/* 드로어(도식화) 상단 칸/물건 추가 · 최하단 방 추가 */
-.dp-actions{display:flex;gap:4px;padding:2px 4px 6px}
-.dp-form{border-top:1px solid var(--line);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
-.dp-form .row{display:flex;gap:8px}
-.dp-form input[type=text]{
-  flex:1;padding:9px 11px;border-radius:9px;border:1px solid var(--line);
-  font-size:13.5px;outline:none;background:var(--surface);
-}
-.dp-form input[type=text]:focus{border-color:var(--accent)}
-.photo-btn{
-  display:flex;align-items:center;justify-content:center;gap:6px;padding:8px;border-radius:9px;
-  border:1px dashed var(--line);font-size:12.5px;color:var(--ink-soft);background:var(--surface);
-}
-.photo-btn.has{border-style:solid;border-color:var(--green);color:var(--green)}
-.add-btn{
-  padding:10px;border-radius:8px;background:var(--accent);color:#fff;
-  font-size:14px;font-weight:700;transition:opacity .15s;
-}
-.add-btn:hover{opacity:.9}
 
 /* ---------- Modal ---------- */
 .modal-wrap{
