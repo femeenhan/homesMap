@@ -13,7 +13,7 @@ export type Room = {
 export type Compartment = { id: UUID; name: string; parent_id?: UUID | null }
 export type Storage = {
   id: UUID; family_id: UUID; room_id: UUID; type: StorageTypeKey; name: string
-  x: number; y: number; compartments: Compartment[]; updated_at: string; deleted_at: string | null
+  x: number; y: number; w?: number | null; h?: number | null; compartments: Compartment[]; updated_at: string; deleted_at: string | null
 }
 // 서버 저장 형태(암호블롭). 앱 메모리에서는 복호화된 DecItem 사용.
 export type Item = {
