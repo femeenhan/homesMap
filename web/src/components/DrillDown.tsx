@@ -29,7 +29,7 @@ export function DrillDown(p: HomeTreeProps) {
 }
 
 // 상단 바: ‹ 뒤로 + 현재 이름(⋯로 이름수정·삭제)
-function DrillHeader({ name, onBack, onRename, onDelete, deleteTitle, deleteMessage }: {
+export function DrillHeader({ name, onBack, onRename, onDelete, deleteTitle, deleteMessage }: {
   name: string; onBack: () => void; onRename: (n: string) => void; onDelete: () => void
   deleteTitle: string; deleteMessage: string
 }) {

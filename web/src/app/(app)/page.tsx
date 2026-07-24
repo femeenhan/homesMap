@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { keys, fetchPrimaryFamilyId } from '@/lib/keys'
 import { store } from '@/lib/store'
@@ -11,16 +11,13 @@ import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/lib/useToast'
 import { Header } from '@/components/Header'
 import { ActivityFeed } from '@/components/ActivityFeed'
-import { MapCanvas } from '@/components/MapCanvas'
-import { DetailPanel } from '@/components/DetailPanel'
-import { RoomDetail } from '@/components/RoomDetail'
+import { GridMap } from '@/components/GridMap'
 import { HomeTree } from '@/components/HomeTree'
 import { DrillDown } from '@/components/DrillDown'
 import { useIsMobile } from '@/lib/useIsMobile'
 import type { Room, Storage, Item, DecItem, FamilyMember, Activity, ItemDraft, Compartment } from '@/lib/types'
-import { recomputeChildStorages } from '@/lib/geometry'
 import { descendantIds } from '@/lib/compartments'
-import type { Pt, Rect } from '@/lib/geometry'
+import { COLS, ROOM_DEFAULT, STORAGE_DEFAULT, autoPlace, roomInnerGrid, storageRect, migrateLegacyGeometry, type CellRect } from '@/lib/grid'
 
 type BootData = {
   familyId: string
@@ -41,29 +38,13 @@ export default function AppHomePage() {
   const [view, setView] = useState<'list' | 'map'>('list') // 목록(카테고리 트리)이 기본, 도식화(지도)는 보조
   const isMobile = useIsMobile()
   const [showActivity, setShowActivity] = useState(false)
-  // 선택은 수납장/방 중 하나만 — 물건 드로어와 방 드로어가 배타적으로 열린다.
-  const [selectedStorageId, setSelectedStorageId] = useState<string | null>(null)
-  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
-  const [flashStorageId, setFlashStorageId] = useState<string | null>(null)
-  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [mapFocusId, setMapFocusId] = useState<string | null>(null)
   const { message: toastMsg, showToast } = useToast()
 
-  function selectStorage(storageId: string | null) {
-    setSelectedStorageId(storageId)
-    setSelectedRoomId(null)
-  }
-  function selectRoom(roomId: string | null) {
-    setSelectedRoomId(roomId)
-    setSelectedStorageId(null)
-  }
-
-  // 검색 결과 클릭: 도식화 뷰로 전환(드로어·flash가 지도 뷰에만 있으므로) + 물건 드로어 열기 + 지도에 4초 flash
+  // 검색 결과 클릭: 도식화로 전환해 해당 수납장 확대(L2)로 점프
   function handleSearchPick(storageId: string) {
     setView('map')
-    selectStorage(storageId)
-    setFlashStorageId(storageId)
-    if (flashTimerRef.current) clearTimeout(flashTimerRef.current)
-    flashTimerRef.current = setTimeout(() => setFlashStorageId(null), 4000)
+    setMapFocusId(storageId)
   }
 
   useEffect(() => {
@@ -198,13 +179,29 @@ export default function AppHomePage() {
   async function loadLocalData(familyId: string, userId: string, offline: boolean) {
     const fdk = keys.getFDK()
     if (!fdk) return
-    const [rooms, storages, items, members, activity] = await Promise.all([
+    const [roomsRaw, storagesRaw, items, members, activity] = await Promise.all([
       store.allActive<Room>('rooms'),
       store.allActive<Storage>('storages'),
       store.allActive<Item>('items'),
       store.getAll<FamilyMember>('members'),
       store.getAll<Activity>('activity'),
     ])
+    let rooms = roomsRaw
+    let storages = storagesRaw
+    // 구 px 좌표(940×600 시절) 1회 셀 변환 — 변경분만 dirty 저장(스펙 §2)
+    const mig = migrateLegacyGeometry(rooms, storages)
+    if (mig.changedRooms.length > 0 || mig.changedStorages.length > 0) {
+      const now = new Date().toISOString()
+      const stampedRooms = new Map(mig.changedRooms.map((r) => [r.id, { ...r, updated_at: now }]))
+      const stampedStorages = new Map(mig.changedStorages.map((s) => [s.id, { ...s, updated_at: now }]))
+      rooms = mig.rooms.map((r) => stampedRooms.get(r.id) ?? r)
+      storages = mig.storages.map((s) => stampedStorages.get(s.id) ?? s)
+      await Promise.all([
+        ...[...stampedRooms.values()].map((r) => store.putLocal('rooms', r, { dirty: true })),
+        ...[...stampedStorages.values()].map((s) => store.putLocal('storages', s, { dirty: true })),
+      ])
+      push().catch(() => {})
+    }
     // 손상된 블롭/키 불일치 등으로 한 물건의 복호화가 실패해도 나머지 지도는 정상 렌더 — 실패한 항목만 건너뜀
     const decrypted = await Promise.all(
       items.map(async (it): Promise<DecItem | null> => {
@@ -239,65 +236,6 @@ export default function AppHomePage() {
 
   // ---------- 지도 편집: 방 그리기 / 수납장 놓기 / 방 삭제(연쇄 소프트삭제) ----------
   // 셋 다 같은 패턴: 로컬에 즉시 반영(로컬 우선) → 낙관적 화면 갱신 → push() 시도(오프라인이면 토스트만)
-
-  // 방 생성(1회성): 기본 이름·자동 색으로 즉시 만들고 → 방 드로어를 열어(선택) 이름·색을 정하게 → 기본 상태 복귀.
-  // 중앙 모달 없이 그린 방이 맵에 남는다.
-  async function handleRoomCreate(rect: Rect) {
-    if (!data) return
-    const row: Room = {
-      id: crypto.randomUUID(),
-      family_id: data.familyId,
-      name: '새 방',
-      x: Math.round(rect.x),
-      y: Math.round(rect.y),
-      w: Math.round(rect.w),
-      h: Math.round(rect.h),
-      color_index: data.rooms.length % 5, // 인접 방과 색이 겹치지 않게 순환(ROOM_COLORS 5색)
-      updated_at: new Date().toISOString(),
-      deleted_at: null,
-    }
-    await store.putLocal('rooms', row, { dirty: true })
-    setData((d) => d && { ...d, rooms: [...d.rooms, row] })
-    selectRoom(row.id)
-    try {
-      await push()
-    } catch {
-      showToast('오프라인 — 나중에 동기화됩니다')
-    }
-  }
-
-  // 수납장 배치(1회성): 선택된 종류·기본 이름으로 놓고 → 물건 드로어를 바로 열어(선택) 물건을 등록하게 → 기본 상태 복귀.
-  async function handleStoragePlace(room: Room, point: Pt) {
-    if (!data) return
-    const name = `${room.name} 수납장`
-    const row: Storage = {
-      id: crypto.randomUUID(),
-      family_id: data.familyId,
-      room_id: room.id,
-      type: 'box', // 타입 템플릿 제거 — 새 수납장은 범용(📦), 이름만 받음
-      name,
-      x: Math.round(point.x),
-      y: Math.round(point.y),
-      compartments: [],
-      updated_at: new Date().toISOString(),
-      deleted_at: null,
-    }
-    await store.putLocal('storages', row, { dirty: true })
-    setData((d) => d && { ...d, storages: [...d.storages, row] })
-    selectStorage(row.id)
-    try {
-      await push()
-    } catch {
-      showToast('오프라인 — 나중에 동기화됩니다')
-    }
-    // 활동 기록은 최선노력(best-effort) — 실패(오프라인 등)해도 조용히 무시, UI를 막지 않음
-    void recordActivity(data.familyId, data.userId, 'storage_added', { roomName: room.name, storageName: name })
-  }
-
-  // 방 추가 버튼(방 드로어): 그 방 중앙에 기본 종류로 놓고 물건 드로어를 연다(handleStoragePlace 재사용).
-  function handleAddStorageToRoom(room: Room) {
-    void handleStoragePlace(room, { x: room.x + room.w / 2, y: room.y + room.h / 2 })
-  }
 
   // 드로어에서 방 이름/색 편집
   async function handleRoomUpdateMeta(room: Room, patch: { name?: string; color_index?: number }) {
@@ -353,16 +291,19 @@ export default function AppHomePage() {
   // 목록 뷰에서 방 추가(기본 격자 위치 부여 → 도식화에서 드래그로 재배치)
   async function handleAddRoom(name: string) {
     if (!data) return
-    const n = data.rooms.length
+    const pos = autoPlace(
+      data.rooms.map((r) => ({ x: r.x, y: r.y, w: r.w, h: r.h })),
+      ROOM_DEFAULT, COLS,
+    )
     const row: Room = {
       id: crypto.randomUUID(),
       family_id: data.familyId,
       name,
-      x: 20 + (n % 4) * 232,
-      y: 20 + Math.floor(n / 4) * 190,
-      w: 210,
-      h: 165,
-      color_index: n % 5,
+      x: pos.x,
+      y: pos.y,
+      w: ROOM_DEFAULT.w,
+      h: ROOM_DEFAULT.h,
+      color_index: 0,
       updated_at: new Date().toISOString(),
       deleted_at: null,
     }
@@ -374,15 +315,19 @@ export default function AppHomePage() {
   // 목록 뷰에서 수납장 추가(방 중앙 근처 기본 위치)
   async function handleAddStorageInList(room: Room, name: string) {
     if (!data) return
-    const n = data.storages.filter((s) => s.room_id === room.id).length
+    const inner = roomInnerGrid(room)
+    const sib = data.storages.filter((s) => s.room_id === room.id).map(storageRect)
+    const pos = autoPlace(sib, STORAGE_DEFAULT, inner.cols)
     const row: Storage = {
       id: crypto.randomUUID(),
       family_id: data.familyId,
       room_id: room.id,
       type: 'box',
       name,
-      x: Math.round(room.x + room.w / 2 + ((n % 3) - 1) * 26),
-      y: Math.round(room.y + room.h / 2 + Math.floor(n / 3) * 26),
+      x: pos.x,
+      y: Math.min(pos.y, inner.rows - STORAGE_DEFAULT.h),
+      w: null,
+      h: null,
       compartments: [],
       updated_at: new Date().toISOString(),
       deleted_at: null,
@@ -399,48 +344,21 @@ export default function AppHomePage() {
     return handleItemsAdd(storage, room, [{ ...draft, compartmentId }])
   }
 
-  // 방 이동/리사이즈 커밋: 방 지오메트리 갱신 + 자식 수납장 재계산(이동은 함께, 리사이즈는 밖으로 나간 것만 안으로).
-  // 실제로 위치가 바뀐 수납장만 dirty로 밀어 불필요한 push를 줄인다.
-  async function handleRoomGeometry(room: Room, next: Rect) {
+  // 방 이동/리사이즈 커밋(편집 모드): 셀 좌표 갱신만 — 수납장은 방-로컬 좌표라 함께 움직일 필요 없음
+  async function handleRoomGeometry(room: Room, next: CellRect) {
     if (!data) return
-    const now = new Date().toISOString()
-    const dx = next.x - room.x
-    const dy = next.y - room.y
-    const updatedRoom: Room = { ...room, x: next.x, y: next.y, w: next.w, h: next.h, updated_at: now }
-
-    const kids = data.storages.filter((s) => s.room_id === room.id)
-    const movedKids = recomputeChildStorages(kids, dx, dy, next)
-      .filter((s, i) => s.x !== kids[i].x || s.y !== kids[i].y)
-      .map((s) => ({ ...s, updated_at: now }))
-
+    const updatedRoom: Room = { ...room, ...next, updated_at: new Date().toISOString() }
     await store.putLocal('rooms', updatedRoom, { dirty: true })
-    await Promise.all(movedKids.map((s) => store.putLocal('storages', s, { dirty: true })))
-
-    const movedById = new Map(movedKids.map((s) => [s.id, s]))
-    setData((d) => d && {
-      ...d,
-      rooms: d.rooms.map((r) => (r.id === room.id ? updatedRoom : r)),
-      storages: d.storages.map((s) => movedById.get(s.id) ?? s),
-    })
-
-    try {
-      await push()
-    } catch {
-      showToast('오프라인 — 나중에 동기화됩니다')
-    }
+    setData((d) => d && { ...d, rooms: d.rooms.map((r) => (r.id === room.id ? updatedRoom : r)) })
+    try { await push() } catch { showToast('오프라인 — 나중에 동기화됩니다') }
   }
 
-  // 수납장 이동 커밋: 위치만 갱신(소속 방 안 클램프는 MapCanvas에서 이미 적용됨).
-  async function handleStorageMove(storage: Storage, pos: Pt) {
+  async function handleStorageGeometry(storage: Storage, next: CellRect) {
     if (!data) return
-    const updated: Storage = { ...storage, x: pos.x, y: pos.y, updated_at: new Date().toISOString() }
+    const updated: Storage = { ...storage, ...next, updated_at: new Date().toISOString() }
     await store.putLocal('storages', updated, { dirty: true })
     setData((d) => d && { ...d, storages: d.storages.map((s) => (s.id === storage.id ? updated : s)) })
-    try {
-      await push()
-    } catch {
-      showToast('오프라인 — 나중에 동기화됩니다')
-    }
+    try { await push() } catch { showToast('오프라인 — 나중에 동기화됩니다') }
   }
 
   // kind/payload를 일반화 — Task 10의 storage_added와 Task 11의 item_added가 이 한 경로를 공유
@@ -485,7 +403,6 @@ export default function AppHomePage() {
     await Promise.all(updatedStorages.map((s) => store.putLocal('storages', s, { dirty: true })))
     await Promise.all(updatedItems.map((it) => store.putLocal('items', it, { dirty: true })))
 
-    setSelectedRoomId(null) // 삭제한 방의 드로어 닫기
     setData((d) => d && {
       ...d,
       rooms: d.rooms.filter((r) => r.id !== room.id),
@@ -614,7 +531,6 @@ export default function AppHomePage() {
     await store.putLocal('storages', updatedStorage, { dirty: true })
     await Promise.all(updatedItems.map((it) => store.putLocal('items', it, { dirty: true })))
 
-    setSelectedStorageId(null)
     setData((d) => d && {
       ...d,
       storages: d.storages.filter((s) => s.id !== storage.id),
@@ -650,12 +566,6 @@ export default function AppHomePage() {
   }
 
   if (!data) return null
-
-  const selectedStorage = data.storages.find((s) => s.id === selectedStorageId)
-  const storageRoom = selectedStorage ? data.rooms.find((r) => r.id === selectedStorage.room_id) : undefined
-  const selectedItems = selectedStorage ? data.decItems.filter((it) => it.storage_id === selectedStorage.id) : []
-  const selectedRoom = data.rooms.find((r) => r.id === selectedRoomId)
-  const selectedRoomStorageCount = selectedRoom ? data.storages.filter((s) => s.room_id === selectedRoom.id).length : 0
 
   const treeProps = {
     rooms: data.rooms, storages: data.storages, decItems: data.decItems, members: data.members,
@@ -700,50 +610,9 @@ export default function AppHomePage() {
         </div>
       ) : (
         <div className="main">
-          <MapCanvas
-            tool="none"
-            rooms={data.rooms}
-            storages={data.storages}
-            decItems={data.decItems}
-            selectedRoomId={selectedRoomId}
-            selectedStorageId={selectedStorageId}
-            onStorageClick={selectStorage}
-            onRoomSelect={selectRoom}
-            onRoomCreate={handleRoomCreate}
-            onStoragePlace={handleStoragePlace}
-            onRoomGeometry={handleRoomGeometry}
-            onStorageMove={handleStorageMove}
-            onToast={showToast}
-            flashStorageId={flashStorageId}
-          />
-          {selectedStorage && (
-            <DetailPanel
-              key={selectedStorage.id}
-              storage={selectedStorage}
-              room={storageRoom}
-              items={selectedItems}
-              members={data.members}
-              onClose={() => selectStorage(null)}
-              onRename={(name) => handleStorageRename(selectedStorage, name)}
-              onCompartmentsChange={(compartments) => handleCompartmentsChange(selectedStorage, compartments)}
-              onDeleteCompartment={(id) => handleCompartmentDelete(selectedStorage, id)}
-              onItemsAdd={(drafts) => handleItemsAdd(selectedStorage, storageRoom, drafts)}
-              onItemDelete={handleItemDelete}
-              onStorageDelete={handleStorageDelete}
-            />
-          )}
-          {selectedRoom && (
-            <RoomDetail
-              key={selectedRoom.id}
-              room={selectedRoom}
-              storageCount={selectedRoomStorageCount}
-              onClose={() => selectRoom(null)}
-              onRename={(name) => handleRoomUpdateMeta(selectedRoom, { name })}
-              onColorChange={(i) => handleRoomUpdateMeta(selectedRoom, { color_index: i })}
-              onAddStorage={handleAddStorageToRoom}
-              onDelete={handleRoomDelete}
-            />
-          )}
+          <GridMap {...treeProps}
+            focusStorageId={mapFocusId} onConsumeFocus={() => setMapFocusId(null)}
+            onRoomGeometry={handleRoomGeometry} onStorageGeometry={handleStorageGeometry} />
         </div>
       )}
       {showActivity && (
