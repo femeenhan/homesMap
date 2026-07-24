@@ -210,11 +210,6 @@ header{
 .drill-back:active{background:var(--panel)}
 .drill-title{flex:1;min-width:0;font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .drill-head .trow-name-input{flex:1;font-size:17px;font-weight:600}
-.trow.lv-drill{min-height:48px}
-.lv-drill .trow-caret{display:none}
-/* ⋯와 › 오클릭 방지: ⋯ 히트영역 44px + 화살표와 간격 분리 */
-.lv-drill .trow-iconbtn{min-width:44px;height:44px}
-.lv-drill .trow-chev{margin-left:10px}
 .trow-chev{color:var(--ink-soft);flex-shrink:0}
 
 /* ---------- 도식화(그리드 맵) ---------- */
@@ -235,7 +230,6 @@ header{
 .gm-tile:hover{border-color:var(--accent)}
 .gm-name{font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gm-storage{background:var(--surface)}
-.gmap-foot{padding:8px 2px;font-size:12px;color:var(--ink-soft);text-align:center;flex-shrink:0}
 .gm-room{overflow:hidden}
 /* 방 이름 워터마크 — 중앙·은은·수납장(z1) 아래(스펙: 겹침 시 가려짐 수용, 헤더·확대가 보완) */
 .gm-room > .gm-name{
