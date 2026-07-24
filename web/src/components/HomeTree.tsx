@@ -33,6 +33,7 @@ type Props = {
   onCopyStorage?: (storage: Storage) => void      // ⋯ 복사 → 앱 클립보드
   canPasteStorage?: boolean                       // 클립보드에 수납장 있음 — 방 ⋯에 붙여넣기 노출
   onPasteStorage?: (room: Room) => void
+  onCreateSample?: () => void
 }
 
 // 집 전체 아코디언: 방 → 수납장 → 칸(무한중첩) → 물건. 카테고리화의 본체(목록 뷰).
@@ -43,7 +44,12 @@ export function HomeTree(p: Props) {
       {addingRoom
         ? <InlineInput depth={0} placeholder="방 이름 (예: 안방, 거실)" onSubmit={(n) => { p.onAddRoom(n); setAddingRoom(false) }} onCancel={() => setAddingRoom(false)} />
         : <AddRow depth={0} label="방 추가" onClick={() => setAddingRoom(true)} />}
-      {p.rooms.length === 0 && <div className="tree-empty">아직 방이 없어요. 위 &lsquo;방 추가&rsquo;로 시작해보세요.</div>}
+      {p.rooms.length === 0 && (
+        <div className="tree-empty">
+          아직 방이 없어요. 위 &lsquo;방 추가&rsquo;로 시작하거나
+          <button type="button" className="sample-btn" onClick={() => p.onCreateSample?.()}>예시 집으로 시작하기</button>
+        </div>
+      )}
       {p.rooms.map((room) => <TreeRoom key={room.id} room={room} {...p} />)}
     </div>
   )

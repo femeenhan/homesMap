@@ -12,6 +12,7 @@ self.addEventListener('fetch', (e) => {
   // API/동기화 요청은 건드리지 않음. 정적 문서/스크립트만 stale-while-revalidate.
   if (e.request.method !== 'GET' || url.origin !== location.origin) return
   if (url.pathname.startsWith('/auth/') || url.pathname.startsWith('/api/')) return
+  if (url.pathname === '/version') return // 업데이트 체크는 항상 네트워크(캐시 우회)
   e.respondWith((async () => {
     const cached = await caches.match(e.request)
     const net = fetch(e.request).then(async (res) => {
