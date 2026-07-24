@@ -102,7 +102,7 @@ function HomeCanvas({ p, editing, onToggleEditing, onEditRoom }: {
                     }
                     return (
                       <button key={s.id} type="button" className="gm-sto" style={st}
-                        onClick={(e) => { e.stopPropagation(); p.onOpenStorage?.(s.id) }}>
+                        onClick={(e) => { e.stopPropagation(); p.onFocusStorage?.(s.id) }}>
                         <span>{s.name}</span>
                       </button>
                     )

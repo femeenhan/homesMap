@@ -11,10 +11,9 @@ import { useToast } from '@/lib/useToast'
 import { Header } from '@/components/Header'
 import { GridMap } from '@/components/GridMap'
 import { HomeTree } from '@/components/HomeTree'
-import { StoragePane } from '@/components/StoragePane'
 import { Modal } from '@/components/Modal'
 import type { Room, Storage, Item, DecItem, FamilyMember, Activity, ItemDraft, Compartment } from '@/lib/types'
-import { descendantIds } from '@/lib/compartments'
+import { descendantIds, duplicateCompartments } from '@/lib/compartments'
 import { COLS, ROOM_DEFAULT, STORAGE_DEFAULT, autoPlace, roomInnerGrid, storageRect, migrateLegacyGeometry, type CellRect } from '@/lib/grid'
 import { buildBackup, parseBackup, toBase64, fromBase64, type Backup, type BackupItem } from '@/lib/backup'
 
@@ -35,7 +34,7 @@ export default function AppHomePage() {
   const [data, setData] = useState<BootData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [homeRoomId, setHomeRoomId] = useState<string | null>(null)
-  const [openStorageId, setOpenStorageId] = useState<string | null>(null)
+  const [focusStorageId, setFocusStorageId] = useState<string | null>(null)
   const [searchFlash, setSearchFlash] = useState(false)
   const [pendingImport, setPendingImport] = useState<Backup | null>(null)
   const { message: toastMsg, showToast } = useToast()
@@ -46,9 +45,9 @@ export default function AppHomePage() {
     return () => clearTimeout(t)
   }, [searchFlash])
 
-  // 검색 결과 클릭: 해당 수납장 화면 + 하이라이트
+  // 검색 결과 클릭: 해당 수납장으로 목록 스크롤 + 펼침 + 하이라이트
   function handleSearchPick(storageId: string) {
-    setOpenStorageId(storageId)
+    setFocusStorageId(storageId)
     setSearchFlash(true)
   }
 
@@ -244,6 +243,31 @@ export default function AppHomePage() {
     setData((d) => d && { ...d, storages: [...d.storages, row] })
     try { await push() } catch { showToast('오프라인 — 나중에 동기화됩니다') }
     void recordActivity(data.familyId, data.userId, 'storage_added', { roomName: room.name, storageName: name })
+  }
+
+  // 수납장 복사: 칸 구조까지(물건 제외), 같은 방 빈 자리에 배치
+  async function handleDuplicateStorage(storage: Storage) {
+    if (!data) return
+    const room = data.rooms.find((r) => r.id === storage.room_id)
+    if (!room) return
+    const inner = roomInnerGrid(room)
+    const r = storageRect(storage)
+    const sib = data.storages.filter((s) => s.room_id === storage.room_id).map(storageRect)
+    const pos = autoPlace(sib, { w: r.w, h: r.h }, inner.cols)
+    const row: Storage = {
+      ...storage,
+      id: crypto.randomUUID(),
+      name: `${storage.name} 복사`,
+      x: pos.x,
+      y: Math.min(pos.y, Math.max(0, inner.rows - r.h)),
+      compartments: duplicateCompartments(storage.compartments ?? []),
+      updated_at: new Date().toISOString(),
+      deleted_at: null,
+    }
+    await store.putLocal('storages', row, { dirty: true })
+    setData((d) => d && { ...d, storages: [...d.storages, row] })
+    showToast(`'${row.name}' 추가됨 — 이름은 ⋯에서 바꿀 수 있어요`)
+    try { await push() } catch { showToast('오프라인 — 나중에 동기화됩니다') }
   }
 
   // 트리에서 물건 추가(선택된 칸 소속). 사진/메모는 기존 handleItemsAdd 경로 재사용.
@@ -563,11 +587,13 @@ export default function AppHomePage() {
     onDeleteCompartment: handleCompartmentDelete,
     onAddItem: handleTreeItemAdd,
     onDeleteItem: handleItemDelete,
-    onOpenStorage: setOpenStorageId,
     focusRoomId: homeRoomId,
     onSelectRoom: setHomeRoomId,
+    focusStorageId,
+    storageFlash: searchFlash,
+    onFocusStorage: setFocusStorageId,
+    onDuplicateStorage: handleDuplicateStorage,
   }
-  const openStorage = openStorageId ? (data.storages.find((s) => s.id === openStorageId) ?? null) : null
 
   return (
     <>
@@ -583,23 +609,16 @@ export default function AppHomePage() {
       {data.skippedCount > 0 && (
         <div className="offline-notice">일부 물건({data.skippedCount}개)을 해독하지 못해 표시하지 않았어요.</div>
       )}
-      {openStorage ? (
-        <div className="main">
-          <StoragePane p={treeProps} storage={openStorage} flash={searchFlash}
-            onBack={() => { setOpenStorageId(null); setSearchFlash(false) }} />
+      <div className="home-hybrid">
+        <div className="hh-map">
+          <GridMap {...treeProps}
+            homeRoomId={homeRoomId} onSelectRoom={setHomeRoomId}
+            onRoomGeometry={handleRoomGeometry} onStorageGeometry={handleStorageGeometry} />
         </div>
-      ) : (
-        <div className="home-hybrid">
-          <div className="hh-map">
-            <GridMap {...treeProps}
-              homeRoomId={homeRoomId} onSelectRoom={setHomeRoomId}
-              onRoomGeometry={handleRoomGeometry} onStorageGeometry={handleStorageGeometry} />
-          </div>
-          <div className="hh-list">
-            <HomeTree {...treeProps} />
-          </div>
+        <div className="hh-list">
+          <HomeTree {...treeProps} />
         </div>
-      )}
+      </div>
       {pendingImport && (
         <Modal title="백업 가져오기"
           message={`현재 데이터를 백업 파일 내용(방 ${pendingImport.rooms.length} · 수납장 ${pendingImport.storages.length} · 물건 ${pendingImport.items.length})으로 교체합니다. 되돌릴 수 없어요.`}
