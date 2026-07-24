@@ -106,7 +106,6 @@ header{
 /* 앱 셸 — 넓은 화면에서 폭 제한(중앙 컬럼), 좁은 화면은 전체폭 그대로 */
 .app-shell{flex:1;min-height:0;display:flex;flex-direction:column;width:100%;max-width:800px;margin:0 auto}
 @media (min-width:840px){.app-shell{border-left:1px solid var(--line);border-right:1px solid var(--line)}}
-.main{flex:1;display:flex;min-height:0;position:relative} /* position:relative — 상세 패널 오버레이 드로어의 기준 */
 
 /* ---------- Toolbar ---------- */
 .tb-title{font-size:11px;font-weight:800;color:var(--ink-soft);letter-spacing:1px;margin-bottom:8px}

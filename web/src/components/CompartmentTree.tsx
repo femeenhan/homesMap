@@ -1,6 +1,6 @@
 'use client'
 
-// 공용 인라인 폼·물건 행 모음(트리 컴포넌트는 StoragePane으로 대체됨)
+// 공용 인라인 폼·물건 행 모음 — HomeTree 아코디언(칸·물건 인라인)과 GridMap이 사용
 
 import { useState } from 'react'
 import type { DecItem } from '@/lib/types'
