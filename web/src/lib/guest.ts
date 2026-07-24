@@ -1,10 +1,6 @@
-// 테스트용 게스트 모드: 로그인 없이 앱을 쓸 수 있게 한다.
-// 안전장치 — 게스트는 "이 기기 로컬 전용 샌드박스"다. 서버 동기화(push/pull) 없음, 실데이터 접근 없음
-// (Supabase RLS가 미인증 요청을 차단, 게스트 FDK는 실가족 키와 달라 실데이터 복호화 불가).
-// 실사용자(세션/래핑키 캐시 보유)는 영향 없음 — 게스트는 "인증 세션도 래핑키 캐시도 없는" 방문자에게만 발동.
-//
-// ⚠️ 끄는 법: GUEST_MODE = false 로 바꾸면 로그인 게이트가 그대로 복원된다.
-export const GUEST_MODE = true
+// 기본 로컬 모드: 로그인 없이 이 기기 로컬 전용으로 동작한다(개인용 기본값).
+// 서버 동기화(push/pull) 없음 — sync.ts가 guestSession으로 차단. 데이터는 IndexedDB에만.
+// 로그인·가족 공유는 확장기능으로 보류 — 복원 시 이 모드 위에 계정 전환/업로드 플로우를 얹는다.
 
 export const GUEST_FAMILY_ID = 'guest-local'
 export const GUEST_USER_ID = 'guest'

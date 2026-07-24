@@ -1,12 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { keys, fetchPrimaryFamilyId } from '@/lib/keys'
+import { keys } from '@/lib/keys'
 import { store } from '@/lib/store'
-import { syncNow, push, pull } from '@/lib/sync'
+import { syncNow, push } from '@/lib/sync'
 import { decryptField, encryptField, encryptBytes, importFDKCode } from '@/lib/crypto'
-import { GUEST_MODE, GUEST_FAMILY_ID, GUEST_USER_ID, GUEST_FDK_CODE, guestSession } from '@/lib/guest'
+import { GUEST_FAMILY_ID, GUEST_USER_ID, GUEST_FDK_CODE, guestSession } from '@/lib/guest'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/lib/useToast'
 import { Header } from '@/components/Header'
@@ -32,7 +31,6 @@ type BootData = {
 }
 
 export default function AppHomePage() {
-  const router = useRouter()
   const [data, setData] = useState<BootData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<'list' | 'map'>('list') // 목록(카테고리 트리)이 기본, 도식화(지도)는 보조
@@ -50,130 +48,21 @@ export default function AppHomePage() {
   useEffect(() => {
     (async () => {
       try {
-        // 1) 초대 수락 도중 로그인하러 갔다가 돌아온 경우 — 프래그먼트를 되살려 초대 페이지로 복귀
-        const pendingRaw = sessionStorage.getItem('pendingInvite')
-        if (pendingRaw) {
-          try {
-            const { token, k } = JSON.parse(pendingRaw)
-            if (token && k) {
-              router.replace(`/invite/${token}#k=${k}`)
-              return
-            }
-            sessionStorage.removeItem('pendingInvite') // token/k 없는 쓸모없는 항목 — 남겨두면 다음에도 계속 걸림
-          } catch {
-            sessionStorage.removeItem('pendingInvite')
-          }
-        }
-
-        // 2) 이번 세션에 이미 잠금해제된 상태면 로컬 스토어를 하이드레이트하고 지도를 렌더
-        if (keys.hasFDK()) {
-          await boot()
-          return
-        }
-
-        // 3) 세션 FDK 없음 — 로컬에 래핑 키 캐시가 있으면 오프라인으로도 잠금해제 가능
-        const wrapped = await store.getMeta('wrappedKey')
-        if (wrapped) {
-          router.replace('/unlock')
-          return
-        }
-
-        // 4) 로컬 캐시도 없음 — 온라인으로 가족 멤버십 조회 후 분기
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-          // 세션도 래핑키 캐시도 없는 방문자 — 게스트 모드면 로컬 샌드박스로, 아니면 로그인으로
-          if (GUEST_MODE) { await enterGuest(); return }
-          router.replace('/login')
-          return
-        }
-        const { data: membershipRows } = await supabase.from('family_members').select('id').eq('user_id', user.id).limit(1)
-        router.replace(membershipRows && membershipRows.length > 0 ? '/unlock' : '/onboarding')
+        await enterLocal()
       } catch {
-        setError('연결에 문제가 있어요. 새로고침 해주세요.')
+        setError('데이터를 불러오지 못했어요. 새로고침 해주세요.')
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router])
+  }, [])
 
-  // 게스트(테스트) 진입: 고정 FDK 설정 + 로컬 신원으로 렌더. 서버 동기화·실데이터 접근 없음(로컬 샌드박스).
-  async function enterGuest() {
+  // 기본 로컬 부팅: 고정 FDK 설정 + 로컬 신원으로 렌더. 서버 동기화·실데이터 접근 없음(로컬 전용).
+  async function enterLocal() {
     keys.setFDK(await importFDKCode(GUEST_FDK_CODE))
     guestSession.activate()
     await store.setMeta('familyId', GUEST_FAMILY_ID)
     await store.setMeta('userId', GUEST_USER_ID)
     await loadLocalData(GUEST_FAMILY_ID, GUEST_USER_ID, false)
-  }
-
-  // META-FIRST: 로컬 메타에 캐시된 familyId가 있으면 네트워크 없이 즉시 로컬 스토어로 렌더(오프라인 경로).
-  // 캐시가 없는 "이 기기 최초 부팅"일 때만 온라인 멤버십 조회가 필요.
-  async function boot() {
-    const cachedFamilyId = await store.getMeta<string>('familyId')
-
-    if (cachedFamilyId) {
-      const cachedUserId = (await store.getMeta<string>('userId')) ?? ''
-      try {
-        await loadLocalData(cachedFamilyId, cachedUserId, false)
-      } catch {
-        // 네트워크가 아니라 로컬 IndexedDB 조회/복호화 자체가 실패한 경우 — 네트워크 오류 문구와 구분, 리다이렉트 없음
-        setError('저장된 데이터를 불러오지 못했어요. 새로고침 해주세요.')
-        return
-      }
-      await reconcileWithServer(cachedFamilyId)
-      return
-    }
-
-    try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.replace('/login'); return }
-      const familyId = await fetchPrimaryFamilyId(supabase, user.id)
-      if (!familyId) { setError('연결에 문제가 있어요. 새로고침 해주세요.'); return }
-      await store.setMeta('familyId', familyId)
-      await store.setMeta('userId', user.id)
-
-      let offline = false
-      try {
-        await syncNow(familyId)
-      } catch {
-        offline = true // 서버 동기화 실패 — 로컬 스토어 데이터로 그대로 진행(로컬 우선 원칙)
-      }
-      await loadLocalData(familyId, user.id, offline)
-    } catch {
-      setError('연결에 문제가 있어요. 새로고침 해주세요.') // 로컬 캐시가 전혀 없는 최초 부팅에서만 사용 — 오프라인 경로(위 분기)는 이 에러 화면을 타지 않음
-    }
-  }
-
-  // 캐시된 로컬 데이터로 이미 렌더한 뒤 백그라운드에서 서버와 대조.
-  // - 네트워크 실패(오프라인) → 화면은 그대로, 오프라인 배지만 표시
-  // - 인증된 사용자의 실제(첫 가입) 가족이 캐시와 다름(계정 전환) → 이전 가족의 평문 캐시를 지우고 전환 후 새로 받음
-  // - 일치 → 평소처럼 동기화하고 다시 로드
-  async function reconcileWithServer(cachedFamilyId: string) {
-    try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('오프라인 또는 미인증')
-      const authoritativeFamilyId = await fetchPrimaryFamilyId(supabase, user.id)
-      if (!authoritativeFamilyId) throw new Error('가족 멤버십 없음')
-
-      if (authoritativeFamilyId !== cachedFamilyId) {
-        // 계정 전환: 로컬 스토어가 다른 가족의 평문 데이터를 들고 있으므로 지우고 새 가족으로 전환
-        // ponytail: 아래 pull()이 이 시점에 실패하면 화면이 잠시 이전 가족 데이터로 남을 수 있음(로컬 스토어는
-        // 이미 정리된 상태) — 다음 부팅에서 자동으로 다시 맞춰짐. 재시도 큐까지는 v1 범위 밖.
-        await store.clearFamilyData()
-        await store.setMeta('familyId', authoritativeFamilyId)
-        await store.setMeta('userId', user.id)
-        await pull(authoritativeFamilyId)
-        await loadLocalData(authoritativeFamilyId, user.id, false)
-        return
-      }
-
-      await store.setMeta('userId', user.id) // 같은 기기를 다른 가족 구성원이 잠금해제한 경우 대비 최신화
-      await syncNow(cachedFamilyId)
-      await loadLocalData(cachedFamilyId, user.id, false)
-    } catch {
-      setData((d) => d && { ...d, offline: true })
-    }
   }
 
   async function loadLocalData(familyId: string, userId: string, offline: boolean) {
@@ -363,6 +252,7 @@ export default function AppHomePage() {
 
   // kind/payload를 일반화 — Task 10의 storage_added와 Task 11의 item_added가 이 한 경로를 공유
   async function recordActivity(familyId: string, actorId: string, kind: string, payload: Record<string, string>) {
+    if (guestSession.isActive()) return // 로컬 모드: 활동 기록은 확장기능 보류 — 서버 시도·암호화 생략
     const fdk = keys.getFDK()
     if (!fdk) return
     try {
@@ -597,7 +487,7 @@ export default function AppHomePage() {
       {data.skippedCount > 0 && (
         <div className="offline-notice">일부 물건({data.skippedCount}개)을 해독하지 못해 표시하지 않았어요.</div>
       )}
-      {GUEST_MODE && data.userId === GUEST_USER_ID && (
+      {data.userId === GUEST_USER_ID && (
         <div className="offline-notice">테스트(게스트) 모드 · 로그인 없이 사용 중 — 데이터는 이 기기에만 저장돼요</div>
       )}
       <div className="viewtabs">
