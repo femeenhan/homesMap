@@ -93,7 +93,7 @@ function HomeCanvas({ p, editing, onToggleEditing, onOpenStorage, onEditRoom }: 
                   editing={editing} selected={selectedId === room.id}
                   className="gm-tile gm-room"
                   onSelect={() => { if (selectedId === room.id) onEditRoom(room.id); else setSelectedId(room.id) }}
-                  onOpen={() => {}} // 보기에서 방 탭은 무동작 — 방은 레이아웃일 뿐(스펙 §1)
+                  
                   onCommit={(next) => p.onRoomGeometry(room, next)}>
                   <span className="gm-name">{room.name}</span>
                   {/* 수납장 오버레이 — 방-로컬 셀을 방 사각형에 %-비례 배치 */}
@@ -155,7 +155,7 @@ function RoomEditView({ p, room, onBack }: { p: GridMapProps; room: Room; onBack
                 editing selected={selectedId === s.id}
                 className="gm-tile gm-storage"
                 onSelect={() => setSelectedId(s.id)}
-                onOpen={() => {}}
+                
                 onCommit={(next) => p.onStorageGeometry(s, next)}>
                 <span className="gm-name">{s.name}</span>
               </EditableTile>
@@ -199,12 +199,13 @@ function StorageScreen({ p, storage, flash, onBack }: {
   )
 }
 
-// 편집 가능 타일: 보기=클릭 진입 / 편집=드래그 이동(셀 스냅)·선택 후 코너 핸들 리사이즈.
+// 편집 가능 타일: 편집=드래그 이동(셀 스냅)·선택 후 코너 핸들 리사이즈.
+// 보기 모드에선 정적 컨테이너(내부 수납장 버튼이 인터랙션 담당 — 탑뷰 방 탭은 무동작).
 // 세로는 탑뷰=아래 무제한(행 확장), 방 확대=maxRows로 방 안 클램프.
-function EditableTile({ rect, cell, cols, minW, minH, maxRows, editing, selected, className, onSelect, onOpen, onCommit, children }: {
+function EditableTile({ rect, cell, cols, minW, minH, maxRows, editing, selected, className, onSelect, onCommit, children }: {
   rect: CellRect; cell: number; cols: number; minW: number; minH: number; maxRows?: number
   editing: boolean; selected: boolean; className: string
-  onSelect: () => void; onOpen: () => void; onCommit: (next: CellRect) => void
+  onSelect: () => void; onCommit: (next: CellRect) => void
   children: React.ReactNode
 }) {
   const [drag, setDrag] = useState<{ mode: 'move' | 'resize'; sx: number; sy: number; cur: CellRect } | null>(null)
@@ -251,13 +252,12 @@ function EditableTile({ rect, cell, cols, minW, minH, maxRows, editing, selected
   return (
     <div className={`${className}${editing ? ' gm-edit' : ''}${selected ? ' gm-selected' : ''}`}
       style={{ left: shown.x * cell, top: shown.y * cell, width: shown.w * cell, height: shown.h * cell }}
-      role="button" tabIndex={0}
+      role={editing ? 'button' : undefined} tabIndex={editing ? 0 : undefined}
       onPointerDown={(e) => start('move', e)} onPointerMove={move} onPointerUp={end} onPointerCancel={() => setDrag(null)}
       onClick={() => {
         if (moved.current) { moved.current = false; return }
-        if (editing) onSelect(); else onOpen()
+        if (editing) onSelect()
       }}
-      onKeyDown={(e) => { if (e.key === 'Enter' && !editing) onOpen() }}
     >
       {children}
       {editing && selected && (

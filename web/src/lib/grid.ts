@@ -26,7 +26,7 @@ export function convertLegacyRoom(r: Pick<Room, 'x' | 'y' | 'w' | 'h'>): CellRec
   return { x, y, w, h }
 }
 
-// 방 확대(L1) 내부 그리드: 가로 12칸, 세로는 방 비율 유지(최소 4행)
+// 방 내부 그리드(확대 편집·탑뷰 오버레이 공용): 가로 12칸, 세로는 방 비율 유지(최소 4행)
 export function roomInnerGrid(r: Pick<Room, 'w' | 'h'>): { cols: number; rows: number } {
   return { cols: COLS, rows: Math.max(4, Math.round((COLS * r.h) / r.w)) }
 }

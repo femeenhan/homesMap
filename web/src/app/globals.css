@@ -233,7 +233,6 @@ header{
 }
 .gm-tile:hover{border-color:var(--accent)}
 .gm-name{font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.gm-meta{font-size:11px;color:var(--ink-soft);flex-shrink:0}
 .gm-storage{background:var(--surface)}
 .gmap-foot{padding:8px 2px;font-size:12px;color:var(--ink-soft);text-align:center;flex-shrink:0}
 .gm-room{overflow:hidden}

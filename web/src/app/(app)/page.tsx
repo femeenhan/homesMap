@@ -41,7 +41,7 @@ export default function AppHomePage() {
   const [pendingImport, setPendingImport] = useState<Backup | null>(null)
   const { message: toastMsg, showToast } = useToast()
 
-  // 검색 결과 클릭: 도식화로 전환해 해당 수납장 확대(L2)로 점프
+  // 검색 결과 클릭: 도식화로 전환해 해당 수납장 화면으로 점프
   function handleSearchPick(storageId: string) {
     setView('map')
     setMapFocusId(storageId)
