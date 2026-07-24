@@ -100,3 +100,36 @@ export function RowMenu({ onEditName, onDelete, deleteTitle, deleteMessage }: {
     </>
   )
 }
+
+// 상단 바: ‹ 뒤로 + 현재 이름(⋯로 이름수정·삭제)
+export function DrillHeader({ name, onBack, onRename, onDelete, deleteTitle, deleteMessage }: {
+  name: string; onBack: () => void; onRename: (n: string) => void; onDelete: () => void
+  deleteTitle: string; deleteMessage: string
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(name)
+  return (
+    <div className="drill-head">
+      <button type="button" className="drill-back" aria-label="뒤로" onClick={onBack}>
+        <Icon name="chevron-left" size={20} />
+      </button>
+      {editing ? (
+        <input className="trow-name-input" type="text" autoFocus aria-label="이름 수정"
+          value={draft} maxLength={20}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => { const n = draft.trim(); if (n && n !== name) onRename(n); setEditing(false) }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+            else if (e.key === 'Escape') setEditing(false)
+          }}
+        />
+      ) : (
+        <span className="drill-title">{name}</span>
+      )}
+      {!editing && (
+        <RowMenu onEditName={() => { setDraft(name); setEditing(true) }} onDelete={onDelete}
+          deleteTitle={deleteTitle} deleteMessage={deleteMessage} />
+      )}
+    </div>
+  )
+}
