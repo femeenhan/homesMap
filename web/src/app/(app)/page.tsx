@@ -487,35 +487,40 @@ export default function AppHomePage() {
     const fdk = keys.getFDK()
     if (!fdk) return
     const now = new Date().toISOString()
-    const [oldRooms, oldStorages, oldItems] = await Promise.all([
-      store.getAll<Room>('rooms'), store.getAll<Storage>('storages'), store.getAll<Item>('items'),
-    ])
-    const mine = <T extends { family_id: string }>(rows: T[]) => rows.filter((r) => r.family_id === data.familyId)
-    await Promise.all([
-      ...mine(oldItems).map(async (it) => { await store.removeRow('items', it.id); await store.delPhoto(it.id) }),
-      ...mine(oldRooms).map((r) => store.removeRow('rooms', r.id)),
-      ...mine(oldStorages).map((s) => store.removeRow('storages', s.id)),
-    ])
-    for (const r of backup.rooms) await store.putLocal('rooms', { ...r, family_id: data.familyId, updated_at: now, deleted_at: null }, { dirty: false })
-    for (const s of backup.storages) await store.putLocal('storages', { ...s, family_id: data.familyId, updated_at: now, deleted_at: null }, { dirty: false })
-    for (const it of backup.items) {
-      let photo_path: string | null = null
-      if (it.photo) {
-        await store.putPhoto(it.id, new Blob([fromBase64(it.photo)], { type: 'image/jpeg' }))
-        photo_path = 'local'
+    try {
+      const [oldRooms, oldStorages, oldItems] = await Promise.all([
+        store.getAll<Room>('rooms'), store.getAll<Storage>('storages'), store.getAll<Item>('items'),
+      ])
+      const mine = <T extends { family_id: string }>(rows: T[]) => rows.filter((r) => r.family_id === data.familyId)
+      await Promise.all([
+        ...mine(oldItems).map(async (it) => { await store.removeRow('items', it.id); await store.delPhoto(it.id) }),
+        ...mine(oldRooms).map((r) => store.removeRow('rooms', r.id)),
+        ...mine(oldStorages).map((s) => store.removeRow('storages', s.id)),
+      ])
+      for (const r of backup.rooms) await store.putLocal('rooms', { ...r, family_id: data.familyId, updated_at: now, deleted_at: null }, { dirty: false })
+      for (const s of backup.storages) await store.putLocal('storages', { ...s, family_id: data.familyId, updated_at: now, deleted_at: null }, { dirty: false })
+      for (const it of backup.items) {
+        let photo_path: string | null = null
+        if (it.photo) {
+          await store.putPhoto(it.id, new Blob([fromBase64(it.photo)], { type: 'image/jpeg' }))
+          photo_path = 'local'
+        }
+        const row: Item = {
+          id: it.id, family_id: data.familyId, storage_id: it.storage_id,
+          compartment_id: it.compartment_id ?? null,
+          enc_name: await encryptField(fdk, it.name),
+          enc_memo: it.memo ? await encryptField(fdk, it.memo) : null,
+          emoji: '📦', photo_path, created_by: data.userId,
+          created_at: it.created_at, updated_at: now, deleted_at: null,
+        }
+        await store.putLocal('items', row, { dirty: false })
       }
-      const row: Item = {
-        id: it.id, family_id: data.familyId, storage_id: it.storage_id,
-        compartment_id: it.compartment_id ?? null,
-        enc_name: await encryptField(fdk, it.name),
-        enc_memo: it.memo ? await encryptField(fdk, it.memo) : null,
-        emoji: '📦', photo_path, created_by: data.userId,
-        created_at: it.created_at, updated_at: now, deleted_at: null,
-      }
-      await store.putLocal('items', row, { dirty: false })
+      showToast('백업을 가져왔어요')
+    } catch {
+      showToast('가져오기에 실패했어요 — 파일이 손상됐을 수 있어요')
+    } finally {
+      await loadLocalData(data.familyId, data.userId, false)
     }
-    await loadLocalData(data.familyId, data.userId, false)
-    showToast('백업을 가져왔어요')
   }
 
   if (error) {
