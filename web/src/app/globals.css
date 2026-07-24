@@ -209,7 +209,6 @@ header{
 .drill-back:active{background:var(--panel)}
 .drill-title{flex:1;min-width:0;font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .drill-head .trow-name-input{flex:1;font-size:17px;font-weight:600}
-.trow-chev{color:var(--ink-soft);flex-shrink:0}
 
 /* ---------- 도식화(그리드 맵) ---------- */
 .gmap-page{flex:1;min-height:0;display:flex;flex-direction:column;max-width:720px;margin:0 auto;width:100%;padding:12px 12px 0}

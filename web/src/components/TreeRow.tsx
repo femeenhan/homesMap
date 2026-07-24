@@ -17,7 +17,6 @@ type Props = {
   deleteMessage: string
   onDelete: () => void
   levelClass?: string
-  chevron?: boolean
   addActions?: { icon: IconName; label: string; onClick: () => void }[] // 행 인라인 추가 버튼들(이 레벨에서 바로 추가 가능한 동작 — 예: 방→수납장/칸)
   onDuplicate?: () => void
 }
@@ -27,7 +26,7 @@ const pad = (d: number) => ({ paddingLeft: d * 14 + 6 })
 // 방/수납장/칸 공용 행. 탭=펼치기, 이름수정은 ⋯메뉴로만(탭으로 편집 안 됨). 추가는 addActions(행 인라인 버튼) 또는 화면 단위 AddRow가 담당.
 export function TreeRow({
   depth, icon, name, count, expandable, expanded, onToggle,
-  onRename, deleteTitle, deleteMessage, onDelete, levelClass = '', addActions, onDuplicate, chevron,
+  onRename, deleteTitle, deleteMessage, onDelete, levelClass = '', addActions, onDuplicate,
 }: Props) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(name)
@@ -74,7 +73,6 @@ export function TreeRow({
           <RowMenu onEditName={startEdit} onDelete={onDelete} deleteTitle={deleteTitle} deleteMessage={deleteMessage} onDuplicate={onDuplicate} />
         </span>
       )}
-      {!editing && chevron && <Icon name="chevron-right" size={16} className="trow-chev" />}
     </div>
   )
 }

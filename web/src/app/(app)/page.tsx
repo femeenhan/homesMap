@@ -45,6 +45,13 @@ export default function AppHomePage() {
     return () => clearTimeout(t)
   }, [searchFlash])
 
+  // 포커스는 소비형 — 펼침·스크롤·하이라이트가 끝나면 자동 해제(잔재로 인한 재마운트 재스크롤·무한 sel 방지)
+  useEffect(() => {
+    if (!focusStorageId) return
+    const t = setTimeout(() => setFocusStorageId(null), 2000)
+    return () => clearTimeout(t)
+  }, [focusStorageId])
+
   // 검색 결과 클릭: 해당 수납장으로 목록 스크롤 + 펼침 + 하이라이트
   function handleSearchPick(storageId: string) {
     setFocusStorageId(storageId)
