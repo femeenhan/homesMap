@@ -24,6 +24,7 @@ type Props = {
   onDeleteCompartment: (storage: Storage, id: string) => void
   onAddItem: (storage: Storage, compartmentId: string | null, draft: AddDraft) => void | Promise<void>
   onDeleteItem: (item: DecItem) => void
+  onOpenItem?: (id: string) => void
   focusRoomId?: string | null
   onSelectRoom?: (id: string | null) => void
   focusStorageId?: string | null
@@ -131,7 +132,7 @@ function TreeStorage({ storage, ...p }: { storage: Storage } & Props) {
           {addingCmp && <InlineInput depth={2} placeholder="칸 이름" onSubmit={(n) => { p.onCompartmentsChange(storage, [...compartments, { id: crypto.randomUUID(), name: n, parent_id: null }]); setAddingCmp(false) }} onCancel={() => setAddingCmp(false)} />}
           {addingItem && <InlineItemForm depth={2} onSubmit={async (d) => { await p.onAddItem(storage, null, d); setAddingItem(false) }} onCancel={() => setAddingItem(false)} />}
           {roots.map((c) => <CmpNode key={c.id} cmp={c} depth={2} storage={storage} compartments={compartments} {...p} />)}
-          {direct.map((it) => <ItemRow key={it.id} item={it} photoUrl={p.photoUrls?.[it.id]} depth={2} onDelete={p.onDeleteItem} />)}
+          {direct.map((it) => <ItemRow key={it.id} item={it} photoUrl={p.photoUrls?.[it.id]} depth={2} onDelete={p.onDeleteItem} onOpen={() => p.onOpenItem?.(it.id)} />)}
         </>
       )}
     </div>
@@ -167,7 +168,7 @@ function CmpNode({ cmp, depth, storage, compartments, ...p }: {
           {addingCmp && <InlineInput depth={depth + 1} placeholder="칸 이름" onSubmit={(n) => { p.onCompartmentsChange(storage, [...compartments, { id: crypto.randomUUID(), name: n, parent_id: cmp.id }]); setAddingCmp(false) }} onCancel={() => setAddingCmp(false)} />}
           {addingItem && <InlineItemForm depth={depth + 1} onSubmit={async (d) => { await p.onAddItem(storage, cmp.id, d); setAddingItem(false) }} onCancel={() => setAddingItem(false)} />}
           {children.map((c) => <CmpNode key={c.id} cmp={c} depth={depth + 1} storage={storage} compartments={compartments} {...p} />)}
-          {myItems.map((it) => <ItemRow key={it.id} item={it} photoUrl={p.photoUrls?.[it.id]} depth={depth + 1} onDelete={p.onDeleteItem} />)}
+          {myItems.map((it) => <ItemRow key={it.id} item={it} photoUrl={p.photoUrls?.[it.id]} depth={depth + 1} onDelete={p.onDeleteItem} onOpen={() => p.onOpenItem?.(it.id)} />)}
         </>
       )}
     </div>

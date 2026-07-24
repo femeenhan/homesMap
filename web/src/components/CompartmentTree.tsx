@@ -72,11 +72,13 @@ export function AddRow({ depth, label, onClick }: { depth: number; label: string
   return <button type="button" className="tadd-row" style={pad(depth)} onClick={onClick}>＋ {label}</button>
 }
 
-export function ItemRow({ item, photoUrl, depth, onDelete }: {
-  item: DecItem; photoUrl?: string; depth: number; onDelete: (i: DecItem) => void
+export function ItemRow({ item, photoUrl, depth, onDelete, onOpen }: {
+  item: DecItem; photoUrl?: string; depth: number; onDelete: (i: DecItem) => void; onOpen?: () => void
 }) {
   return (
-    <div className="titem" style={pad(depth)}>
+    <div className="titem" style={pad(depth)} onClick={onOpen}
+      role={onOpen ? 'button' : undefined} tabIndex={onOpen ? 0 : undefined}
+      onKeyDown={onOpen ? (e) => { if (e.key === 'Enter') onOpen() } : undefined}>
       <span className="trow-caret" aria-hidden="true" />{/* 트리 행과 동일한 캐럿 자리 — 하위 항목 정렬 */}
       <span className="titem-thumb">
         {photoUrl
@@ -87,7 +89,9 @@ export function ItemRow({ item, photoUrl, depth, onDelete }: {
       <span className="titem-name">{item.name}</span>
       {item.photo_path && !photoUrl && <Icon name="camera" size={12} className="titem-cam" />}
       {item.memo && <span className="titem-memo">{item.memo}</span>}
-      <DeleteBtn title="물건 삭제" onConfirm={() => onDelete(item)} />
+      <span className="titem-del-wrap" onClick={(e) => e.stopPropagation()}>
+        <DeleteBtn title="물건 삭제" onConfirm={() => onDelete(item)} />
+      </span>
     </div>
   )
 }

@@ -11,6 +11,7 @@ import { useToast } from '@/lib/useToast'
 import { Header } from '@/components/Header'
 import { GridMap } from '@/components/GridMap'
 import { HomeTree } from '@/components/HomeTree'
+import { ItemSheet } from '@/components/ItemSheet'
 import { Modal } from '@/components/Modal'
 import type { Room, Storage, Item, DecItem, FamilyMember, Activity, ItemDraft, Compartment } from '@/lib/types'
 import { descendantIds, duplicateCompartments } from '@/lib/compartments'
@@ -38,6 +39,7 @@ export default function AppHomePage() {
   const [searchFlash, setSearchFlash] = useState(false)
   const [storageClipboard, setStorageClipboard] = useState<Storage | null>(null) // 수납장 복사 스냅샷
   const [pendingImport, setPendingImport] = useState<Backup | null>(null)
+  const [openItemId, setOpenItemId] = useState<string | null>(null)
   const { message: toastMsg, showToast } = useToast()
 
   useEffect(() => {
@@ -468,6 +470,52 @@ export default function AppHomePage() {
     }
   }
 
+  // 물건 수정: 이름/메모 재암호화, 사진 교체(File)/삭제(null)/유지(undefined). photoUrls·objectURL 정리 포함.
+  async function handleItemUpdate(item: DecItem, patch: { name?: string; memo?: string; photoFile?: File | null }) {
+    if (!data) return
+    const fdk = keys.getFDK()
+    if (!fdk) return
+    const now = new Date().toISOString()
+    const name = patch.name ?? item.name
+    const memo = patch.memo ?? item.memo
+    let photo_path = item.photo_path
+    let newUrl: string | undefined
+    if (patch.photoFile instanceof File) {
+      const bytes = await downscaleImage(patch.photoFile)
+      const blob = new Blob([bytes], { type: 'image/jpeg' })
+      await store.putPhoto(item.id, blob)
+      photo_path = 'local'
+      newUrl = URL.createObjectURL(blob)
+    } else if (patch.photoFile === null) {
+      await store.delPhoto(item.id)
+      photo_path = null
+    }
+    const row: Item = {
+      id: item.id, family_id: item.family_id, storage_id: item.storage_id, compartment_id: item.compartment_id,
+      enc_name: await encryptField(fdk, name),
+      enc_memo: memo ? await encryptField(fdk, memo) : null,
+      emoji: item.emoji, photo_path, created_by: item.created_by,
+      created_at: item.created_at, updated_at: now, deleted_at: null,
+    }
+    await store.putLocal('items', row, { dirty: true })
+    setData((d) => {
+      if (!d) return d
+      const photoUrls = { ...d.photoUrls }
+      if (patch.photoFile === null || newUrl) {
+        const old = photoUrls[item.id]
+        if (old) URL.revokeObjectURL(old)
+        delete photoUrls[item.id]
+      }
+      if (newUrl) photoUrls[item.id] = newUrl
+      return {
+        ...d,
+        decItems: d.decItems.map((it) => (it.id === item.id ? { ...it, name, memo, photo_path, updated_at: now } : it)),
+        photoUrls,
+      }
+    })
+    try { await push() } catch { showToast('오프라인 — 나중에 동기화됩니다') }
+  }
+
   async function handleStorageDelete(storage: Storage) {
     if (!data) return
     const now = new Date().toISOString()
@@ -604,6 +652,7 @@ export default function AppHomePage() {
     onDeleteCompartment: handleCompartmentDelete,
     onAddItem: handleTreeItemAdd,
     onDeleteItem: handleItemDelete,
+    onOpenItem: setOpenItemId,
     focusRoomId: homeRoomId,
     onSelectRoom: setHomeRoomId,
     focusStorageId,
@@ -613,6 +662,8 @@ export default function AppHomePage() {
     canPasteStorage: storageClipboard !== null,
     onPasteStorage: handlePasteStorage,
   }
+
+  const openItem = openItemId ? (data?.decItems.find((it) => it.id === openItemId) ?? null) : null
 
   return (
     <>
@@ -644,6 +695,13 @@ export default function AppHomePage() {
           okText="교체"
           onCancel={() => setPendingImport(null)}
           onConfirm={() => { const b = pendingImport; setPendingImport(null); if (b) void applyImport(b) }} />
+      )}
+      {openItem && data && (
+        <ItemSheet item={openItem} photoUrl={data.photoUrls[openItem.id]}
+          rooms={data.rooms} storages={data.storages}
+          onUpdate={(patch) => handleItemUpdate(openItem, patch)}
+          onDelete={() => { void handleItemDelete(openItem); setOpenItemId(null) }}
+          onClose={() => setOpenItemId(null)} />
       )}
       <div className={`toast${toastMsg ? ' show' : ''}`}>{toastMsg}</div>
     </>
