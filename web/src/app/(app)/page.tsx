@@ -12,6 +12,7 @@ import { Header } from '@/components/Header'
 import { GridMap } from '@/components/GridMap'
 import { HomeTree } from '@/components/HomeTree'
 import { DrillDown } from '@/components/DrillDown'
+import { StoragePane } from '@/components/StoragePane'
 import { Modal } from '@/components/Modal'
 import { useIsMobile } from '@/lib/useIsMobile'
 import type { Room, Storage, Item, DecItem, FamilyMember, Activity, ItemDraft, Compartment } from '@/lib/types'
@@ -38,6 +39,7 @@ export default function AppHomePage() {
   const [view, setView] = useState<'list' | 'map'>('list') // 목록(카테고리 트리)이 기본, 도식화(지도)는 보조
   const isMobile = useIsMobile()
   const [mapFocusId, setMapFocusId] = useState<string | null>(null)
+  const [openStorageId, setOpenStorageId] = useState<string | null>(null)
   const [pendingImport, setPendingImport] = useState<Backup | null>(null)
   const { message: toastMsg, showToast } = useToast()
 
@@ -558,7 +560,9 @@ export default function AppHomePage() {
     onDeleteCompartment: handleCompartmentDelete,
     onAddItem: handleTreeItemAdd,
     onDeleteItem: handleItemDelete,
+    onOpenStorage: setOpenStorageId,
   }
+  const openStorage = openStorageId ? (data.storages.find((s) => s.id === openStorageId) ?? null) : null
 
   return (
     <>
@@ -579,9 +583,15 @@ export default function AppHomePage() {
         <button type="button" className={view === 'map' ? 'active' : ''} onClick={() => setView('map')}>도식화</button>
       </div>
       {view === 'list' ? (
-        <div className="tree-view">
-          {isMobile ? <DrillDown {...treeProps} /> : <HomeTree {...treeProps} />}
-        </div>
+        openStorage ? (
+          <div className="main">
+            <StoragePane p={treeProps} storage={openStorage} onBack={() => setOpenStorageId(null)} />
+          </div>
+        ) : (
+          <div className="tree-view">
+            {isMobile ? <DrillDown {...treeProps} /> : <HomeTree {...treeProps} />}
+          </div>
+        )
       ) : (
         <div className="main">
           <GridMap {...treeProps}

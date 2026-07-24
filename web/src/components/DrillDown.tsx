@@ -1,14 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import type { Compartment, Storage } from '@/lib/types'
 import { resolvePath, type PathSeg } from '@/lib/drillPath'
-import { childCompartments } from '@/lib/compartments'
-import { AddRow, InlineAddForm, InlineInput, ItemRow } from './CompartmentTree'
+import { AddRow, InlineInput } from './CompartmentTree'
 import { TreeRow, DrillHeader } from './TreeRow'
 import type { HomeTreeProps } from './HomeTree'
 
-// 모바일 드릴다운: 한 화면 = 한 레벨. 방 목록 → 방 → 수납장 → 칸(무한중첩) → 물건.
+// 모바일 드릴다운: 한 화면 = 한 레벨. 방 목록 → 방(수납장 탭은 StoragePane으로 진입).
 // 경로는 state, 렌더는 resolvePath가 검증한 유효 접두사만 사용 — 동기화로 노드가 사라져도 조상 화면으로 복귀.
 export function DrillDown(p: HomeTreeProps) {
   const [path, setPath] = useState<PathSeg[]>([])
@@ -20,11 +18,9 @@ export function DrillDown(p: HomeTreeProps) {
   const back = () => setPath(toSegs().slice(0, -1))
 
   if (!cur) return <RootScreen p={p} onEnter={enter} />
-  if (cur.kind === 'room') return <RoomScreen p={p} room={cur.room} onEnter={enter} onBack={back} />
-  return (
-    <ContainerScreen p={p} storage={cur.storage} parent={cur.kind === 'cmp' ? cur.cmp : null}
-      onEnter={enter} onBack={back} />
-  )
+  // storage/cmp 세그는 더 이상 생성되지 않음(resolvePath가 만들 수 없음) — 타입 내로잉용 가드
+  if (cur.kind !== 'room') return <RootScreen p={p} onEnter={enter} />
+  return <RoomScreen p={p} room={cur.room} onBack={back} />
 }
 
 function RootScreen({ p, onEnter }: { p: HomeTreeProps; onEnter: (s: PathSeg) => void }) {
@@ -49,8 +45,8 @@ function RootScreen({ p, onEnter }: { p: HomeTreeProps; onEnter: (s: PathSeg) =>
   )
 }
 
-function RoomScreen({ p, room, onEnter, onBack }: {
-  p: HomeTreeProps; room: HomeTreeProps['rooms'][number]; onEnter: (s: PathSeg) => void; onBack: () => void
+function RoomScreen({ p, room, onBack }: {
+  p: HomeTreeProps; room: HomeTreeProps['rooms'][number]; onBack: () => void
 }) {
   const [adding, setAdding] = useState(false)
   const storages = p.storages.filter((s) => s.room_id === room.id)
@@ -68,63 +64,12 @@ function RoomScreen({ p, room, onEnter, onBack }: {
         <TreeRow key={s.id} depth={0} levelClass="lv-drill lv-storage" icon="folder" name={s.name}
           count={p.decItems.filter((it) => it.storage_id === s.id).length}
           expandable={false} expanded={false} chevron
-          onToggle={() => onEnter({ kind: 'storage', id: s.id })}
+          onToggle={() => p.onOpenStorage?.(s.id)}
           onRename={(n) => p.onRenameStorage(s, n)}
           deleteTitle="수납장 삭제" deleteMessage={`'${s.name}' 수납장과 그 안의 물건이 함께 삭제됩니다`}
           onDelete={() => p.onDeleteStorage(s)}
         />
       ))}
-    </div>
-  )
-}
-
-// 수납장 직속(parent=null) 또는 칸 내부(parent=칸) 화면 — 하위 칸 + 물건
-function ContainerScreen({ p, storage, parent, onEnter, onBack }: {
-  p: HomeTreeProps; storage: Storage; parent: Compartment | null
-  onEnter: (s: PathSeg) => void; onBack: () => void
-}) {
-  const [adding, setAdding] = useState(false)
-  const compartments = storage.compartments ?? []
-  const children = childCompartments(compartments, parent?.id ?? null)
-  const validIds = new Set(compartments.map((c) => c.id))
-  const allItems = p.decItems.filter((it) => it.storage_id === storage.id)
-  const items = parent
-    ? allItems.filter((it) => it.compartment_id === parent.id)
-    : allItems.filter((it) => !it.compartment_id || !validIds.has(it.compartment_id))
-  const head = parent
-    ? {
-        name: parent.name,
-        onRename: (n: string) => p.onCompartmentsChange(storage, compartments.map((c) => (c.id === parent.id ? { ...c, name: n } : c))),
-        deleteTitle: '칸 삭제', deleteMessage: `'${parent.name}' 칸과 그 안의 칸·물건이 함께 삭제됩니다`,
-        onDelete: () => p.onDeleteCompartment(storage, parent.id),
-      }
-    : {
-        name: storage.name,
-        onRename: (n: string) => p.onRenameStorage(storage, n),
-        deleteTitle: '수납장 삭제', deleteMessage: `'${storage.name}' 수납장과 그 안의 물건이 함께 삭제됩니다`,
-        onDelete: () => p.onDeleteStorage(storage),
-      }
-  return (
-    <div className="home-tree">
-      <DrillHeader onBack={onBack} {...head} />
-      {adding
-        ? <InlineAddForm depth={0}
-            onAddCompartment={(n) => { p.onCompartmentsChange(storage, [...compartments, { id: crypto.randomUUID(), name: n, parent_id: parent?.id ?? null }]); setAdding(false) }}
-            onAddItem={async (d) => { await p.onAddItem(storage, parent?.id ?? null, d); setAdding(false) }}
-            onCancel={() => setAdding(false)} />
-        : <AddRow depth={0} label="추가" onClick={() => setAdding(true)} />}
-      {children.length === 0 && items.length === 0 && <div className="tree-empty">아직 비어 있어요.</div>}
-      {children.map((c) => (
-        <TreeRow key={c.id} depth={0} levelClass="lv-drill" icon="folder" name={c.name}
-          count={allItems.filter((it) => it.compartment_id === c.id).length}
-          expandable={false} expanded={false} chevron
-          onToggle={() => onEnter({ kind: 'cmp', id: c.id })}
-          onRename={(n) => p.onCompartmentsChange(storage, compartments.map((x) => (x.id === c.id ? { ...x, name: n } : x)))}
-          deleteTitle="칸 삭제" deleteMessage={`'${c.name}' 칸과 그 안의 칸·물건이 함께 삭제됩니다`}
-          onDelete={() => p.onDeleteCompartment(storage, c.id)}
-        />
-      ))}
-      {items.map((it) => <ItemRow key={it.id} item={it} photoUrl={p.photoUrls?.[it.id]} depth={0} onDelete={p.onDeleteItem} />)}
     </div>
   )
 }

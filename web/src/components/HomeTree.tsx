@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import type { Room, Storage, DecItem, FamilyMember, Compartment } from '@/lib/types'
-import { CompartmentTree, InlineInput, AddRow, InlineAddForm } from './CompartmentTree'
+import { InlineInput, AddRow } from './CompartmentTree'
 import { TreeRow } from './TreeRow'
 
 type AddDraft = { name: string; memo: string; photoFile?: File }
@@ -23,6 +23,7 @@ type Props = {
   onDeleteCompartment: (storage: Storage, id: string) => void
   onAddItem: (storage: Storage, compartmentId: string | null, draft: AddDraft) => void | Promise<void>
   onDeleteItem: (item: DecItem) => void
+  onOpenStorage?: (id: string) => void
 }
 
 // 집 전체 아코디언: 방 → 수납장 → 칸(무한중첩) → 물건. 카테고리화의 본체(목록 뷰).
@@ -58,47 +59,24 @@ function TreeRoom({ room, ...p }: { room: Room } & Props) {
           {adding
             ? <InlineInput depth={1} placeholder="수납장 이름 (예: 서랍장1)" onSubmit={(n) => { p.onAddStorage(room, n); setAdding(false) }} onCancel={() => setAdding(false)} />
             : <AddRow depth={1} label="수납장 추가" onClick={() => setAdding(true)} />}
-          {storages.map((s) => <TreeStorage key={s.id} storage={s} room={room} {...p} />)}
+          {storages.map((s) => <TreeStorage key={s.id} storage={s} {...p} />)}
         </>
       )}
     </div>
   )
 }
 
-function TreeStorage({ storage, ...p }: { storage: Storage; room: Room } & Props) {
-  const [expanded, setExpanded] = useState(false)
-  const [adding, setAdding] = useState(false)
+function TreeStorage({ storage, ...p }: { storage: Storage } & Props) {
   const items = p.decItems.filter((it) => it.storage_id === storage.id)
-  const compartments = storage.compartments ?? []
-  const hasKids = compartments.length > 0 || items.length > 0
   return (
-    <div className="tnode">
-      <TreeRow
-        depth={1} levelClass="lv-storage" icon="folder" name={storage.name} count={items.length}
-        expandable={hasKids}
-        expanded={expanded} onToggle={() => setExpanded((e) => !e)}
-        onRename={(n) => p.onRenameStorage(storage, n)}
-        deleteTitle="수납장 삭제" deleteMessage={`'${storage.name}' 수납장과 그 안의 물건이 함께 삭제됩니다`}
-        onDelete={() => p.onDeleteStorage(storage)}
-      />
-      {expanded && (
-        <>
-          {adding
-            ? <InlineAddForm depth={2}
-                onAddCompartment={(n) => { p.onCompartmentsChange(storage, [...compartments, { id: crypto.randomUUID(), name: n, parent_id: null }]); setAdding(false) }}
-                onAddItem={async (d) => { await p.onAddItem(storage, null, d); setAdding(false) }}
-                onCancel={() => setAdding(false)} />
-            : <AddRow depth={2} label="추가" onClick={() => setAdding(true)} />}
-          <CompartmentTree
-            storage={storage} items={items} members={p.members} photoUrls={p.photoUrls} baseDepth={2}
-            onCompartmentsChange={(c) => p.onCompartmentsChange(storage, c)}
-            onDeleteCompartment={(id) => p.onDeleteCompartment(storage, id)}
-            onAddItem={(cid, d) => p.onAddItem(storage, cid, d)}
-            onDeleteItem={p.onDeleteItem}
-          />
-        </>
-      )}
-    </div>
+    <TreeRow
+      depth={1} levelClass="lv-storage" icon="folder" name={storage.name} count={items.length}
+      expandable={false} expanded={false} chevron
+      onToggle={() => p.onOpenStorage?.(storage.id)}
+      onRename={(n) => p.onRenameStorage(storage, n)}
+      deleteTitle="수납장 삭제" deleteMessage={`'${storage.name}' 수납장과 그 안의 물건이 함께 삭제됩니다`}
+      onDelete={() => p.onDeleteStorage(storage)}
+    />
   )
 }
 
