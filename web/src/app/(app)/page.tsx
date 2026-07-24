@@ -585,7 +585,8 @@ export default function AppHomePage() {
       )}
       {openStorage ? (
         <div className="main">
-          <StoragePane p={treeProps} storage={openStorage} flash={searchFlash} onBack={() => setOpenStorageId(null)} />
+          <StoragePane p={treeProps} storage={openStorage} flash={searchFlash}
+            onBack={() => { setOpenStorageId(null); setSearchFlash(false) }} />
         </div>
       ) : (
         <div className="home-hybrid">
