@@ -1,5 +1,5 @@
 {
-  "name": "홈즈맵", "short_name": "홈즈맵", "start_url": "/", "display": "standalone",
+  "name": "그거거기", "short_name": "그거거기", "start_url": "/", "display": "standalone",
   "background_color": "#ffffff", "theme_color": "#ffffff",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },

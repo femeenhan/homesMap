@@ -571,7 +571,7 @@ export default function AppHomePage() {
     const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
     const a = document.createElement('a')
     a.href = url
-    a.download = `homes-map-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.download = `그거거기-백업-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
     showToast('백업 파일을 내려받았어요')

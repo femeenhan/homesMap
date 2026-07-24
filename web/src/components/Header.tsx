@@ -17,8 +17,7 @@ export function Header({ decItems, storages, rooms, onSearchPick, onExport, onIm
   return (
     <header>
       <div className="logo">
-        <h1>홈즈맵</h1>
-        <span className="en">HOMES MAP</span>
+        <h1>그거거기</h1>
       </div>
       <SearchBar decItems={decItems} storages={storages} rooms={rooms} onPick={onSearchPick} />
       <SettingsSheet onExport={onExport} onImportFile={onImportFile} />

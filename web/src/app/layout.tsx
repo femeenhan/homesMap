@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "홈즈맵",
-  description: "우리 집 물건 지도",
+  title: "그거거기",
+  description: "그거 어딨지? 우리 집 물건 지도",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: "/icon-192.png",

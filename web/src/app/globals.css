@@ -61,7 +61,6 @@ header{
 }
 .logo{display:flex;align-items:baseline;gap:8px;white-space:nowrap}
 .logo h1{font-size:21px;letter-spacing:-.5px}
-.logo .en{font-size:11px;color:var(--ink-soft);letter-spacing:1px}
 
 .search-wrap{position:relative;flex:1;min-width:240px;max-width:520px}
 .search-input{

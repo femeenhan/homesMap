@@ -1,6 +1,7 @@
 import type { Room, Storage } from './types'
 
 // 백업 파일 v1 — 평문 JSON(로컬 키는 공개 고정값이라 암호화가 무의미). 사진은 base64 인라인.
+// app 태그 'homes-map'은 구 브랜드 시절 파일 호환을 위해 유지(브랜드명 아님).
 export type BackupItem = {
   id: string; storage_id: string; compartment_id: string | null
   name: string; memo: string; created_at: string; photo?: string
@@ -31,7 +32,7 @@ export function parseBackup(text: string): Backup {
   let raw: unknown
   try { raw = JSON.parse(text) } catch { throw new Error('JSON 형식이 아니에요') }
   const b = raw as Partial<Backup>
-  if (b?.app !== 'homes-map') throw new Error('홈즈맵 백업 파일이 아니에요')
+  if (b?.app !== 'homes-map') throw new Error('그거거기 백업 파일이 아니에요')
   if (b.version !== 1) throw new Error('지원하지 않는 백업 버전이에요')
   if (!Array.isArray(b.rooms) || !Array.isArray(b.storages) || !Array.isArray(b.items)) throw new Error('백업 데이터가 손상됐어요')
   for (const r of b.rooms) if (typeof r?.id !== 'string' || typeof r?.name !== 'string') throw new Error('방 데이터가 손상됐어요')

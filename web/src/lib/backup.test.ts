@@ -30,7 +30,7 @@ describe('parseBackup 검증', () => {
     expect(() => parseBackup('not json')).toThrow('JSON 형식이 아니에요')
   })
   it('앱 태그 다름 → throw', () => {
-    expect(() => parseBackup(JSON.stringify({ app: 'other', version: 1, rooms: [], storages: [], items: [] }))).toThrow('홈즈맵 백업 파일이 아니에요')
+    expect(() => parseBackup(JSON.stringify({ app: 'other', version: 1, rooms: [], storages: [], items: [] }))).toThrow('그거거기 백업 파일이 아니에요')
   })
   it('버전 미지원 → throw', () => {
     expect(() => parseBackup(JSON.stringify({ app: 'homes-map', version: 2, rooms: [], storages: [], items: [] }))).toThrow('지원하지 않는 백업 버전이에요')
