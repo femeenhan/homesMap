@@ -9,7 +9,6 @@ import { GUEST_FAMILY_ID, GUEST_USER_ID, GUEST_FDK_CODE, guestSession } from '@/
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/lib/useToast'
 import { Header } from '@/components/Header'
-import { ActivityFeed } from '@/components/ActivityFeed'
 import { GridMap } from '@/components/GridMap'
 import { HomeTree } from '@/components/HomeTree'
 import { DrillDown } from '@/components/DrillDown'
@@ -35,7 +34,6 @@ export default function AppHomePage() {
   const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<'list' | 'map'>('list') // 목록(카테고리 트리)이 기본, 도식화(지도)는 보조
   const isMobile = useIsMobile()
-  const [showActivity, setShowActivity] = useState(false)
   const [mapFocusId, setMapFocusId] = useState<string | null>(null)
   const { message: toastMsg, showToast } = useToast()
 
@@ -474,21 +472,14 @@ export default function AppHomePage() {
   return (
     <>
       <Header
-        familyId={data.familyId}
-        members={data.members}
         decItems={data.decItems}
         storages={data.storages}
         rooms={data.rooms}
-        onToast={showToast}
         onSearchPick={handleSearchPick}
-        onActivityClick={() => setShowActivity(true)}
       />
       {data.offline && <div className="offline-notice">오프라인 — 저장된 데이터로 표시 중</div>}
       {data.skippedCount > 0 && (
         <div className="offline-notice">일부 물건({data.skippedCount}개)을 해독하지 못해 표시하지 않았어요.</div>
-      )}
-      {data.userId === GUEST_USER_ID && (
-        <div className="offline-notice">테스트(게스트) 모드 · 로그인 없이 사용 중 — 데이터는 이 기기에만 저장돼요</div>
       )}
       <div className="viewtabs">
         <button type="button" className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>목록</button>
@@ -503,16 +494,6 @@ export default function AppHomePage() {
           <GridMap {...treeProps}
             focusStorageId={mapFocusId} onConsumeFocus={() => setMapFocusId(null)}
             onRoomGeometry={handleRoomGeometry} onStorageGeometry={handleStorageGeometry} />
-        </div>
-      )}
-      {showActivity && (
-        <div className="sheet-wrap" onClick={() => setShowActivity(false)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="sheet-close" onClick={() => setShowActivity(false)} aria-label="닫기">✕</button>
-            <div className="sheet-body">
-              <ActivityFeed activity={data.activity} members={data.members} />
-            </div>
-          </div>
         </div>
       )}
       <div className={`toast${toastMsg ? ' show' : ''}`}>{toastMsg}</div>
