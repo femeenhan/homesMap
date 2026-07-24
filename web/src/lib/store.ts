@@ -38,10 +38,19 @@ export const store = {
   setMeta(key: string, value: unknown): Promise<void> {
     return idb.put('meta', value, key)
   },
-  // 계정 전환 감지 시 사용: 5개 데이터 스토어를 비우고 lastSync만 리셋.
+  putPhoto(itemId: string, blob: Blob): Promise<void> {
+    return idb.put('photos', blob, itemId)
+  },
+  getPhoto(itemId: string): Promise<Blob | undefined> {
+    return idb.get<Blob>('photos', itemId)
+  },
+  delPhoto(itemId: string): Promise<void> {
+    return idb.del('photos', itemId)
+  },
+  // 계정 전환 감지 시 사용: 5개 데이터 스토어 + 사진 스토어를 비우고 lastSync만 리셋.
   // wrappedKey는 지우지 않음 — 현재 잠금해제된 세션이 소유한 값이라 계정 전환과 무관.
   async clearFamilyData(): Promise<void> {
-    await Promise.all(idb.TABLES.map((t) => idb.clear(t)))
+    await Promise.all([...idb.TABLES.map((t) => idb.clear(t)), idb.clear('photos')])
     await idb.del('meta', 'lastSync')
   },
 }

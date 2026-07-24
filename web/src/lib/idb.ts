@@ -3,11 +3,11 @@
 // never at module import time (Next.js imports this module on the server too).
 
 export type Table = 'rooms' | 'storages' | 'items' | 'activity' | 'members'
-type StoreName = Table | 'meta' | 'dirty'
+type StoreName = Table | 'meta' | 'dirty' | 'photos'
 
 export const TABLES: Table[] = ['rooms', 'storages', 'items', 'activity', 'members']
 const DB_NAME = 'homes-map'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 let dbPromise: Promise<IDBDatabase> | null = null
 
@@ -17,9 +17,10 @@ function openDB(): Promise<IDBDatabase> {
       const req = indexedDB.open(DB_NAME, DB_VERSION)
       req.onupgradeneeded = () => {
         const db = req.result
-        for (const t of TABLES) db.createObjectStore(t, { keyPath: 'id' })
-        db.createObjectStore('meta') // out-of-line key: getMeta/setMeta(key, value)
-        db.createObjectStore('dirty') // out-of-line key `${table}:${id}` -> { table, id }, one entry per dirty row (atomic put/del, no read-modify-write)
+        for (const t of TABLES) if (!db.objectStoreNames.contains(t)) db.createObjectStore(t, { keyPath: 'id' })
+        if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta') // out-of-line key: getMeta/setMeta(key, value)
+        if (!db.objectStoreNames.contains('dirty')) db.createObjectStore('dirty') // out-of-line key `${table}:${id}` -> { table, id }, one entry per dirty row (atomic put/del, no read-modify-write)
+        if (!db.objectStoreNames.contains('photos')) db.createObjectStore('photos') // key=itemId → Blob(평문)
       }
       req.onsuccess = () => resolve(req.result)
       req.onerror = () => reject(req.error)

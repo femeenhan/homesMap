@@ -158,7 +158,7 @@ function ContainerScreen({ p, storage, parent, onEnter, onBack }: {
           onDelete={() => p.onDeleteCompartment(storage, c.id)}
         />
       ))}
-      {items.map((it) => <ItemRow key={it.id} item={it} depth={0} onDelete={p.onDeleteItem} />)}
+      {items.map((it) => <ItemRow key={it.id} item={it} photoUrl={p.photoUrls?.[it.id]} depth={0} onDelete={p.onDeleteItem} />)}
     </div>
   )
 }

@@ -217,7 +217,7 @@ function StorageView({ p, storage, parent, onEnter, onBack, flash }: {
         )}
         {children.length === 0 && items.length === 0 && <div className="tree-empty">아직 비어 있어요.</div>}
         <div className="gm-items">
-          {items.map((it) => <ItemRow key={it.id} item={it} depth={0} onDelete={p.onDeleteItem} />)}
+          {items.map((it) => <ItemRow key={it.id} item={it} photoUrl={p.photoUrls?.[it.id]} depth={0} onDelete={p.onDeleteItem} />)}
         </div>
       </div>
     </div>

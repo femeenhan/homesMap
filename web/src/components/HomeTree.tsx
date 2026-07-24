@@ -12,6 +12,7 @@ type Props = {
   storages: Storage[]
   decItems: DecItem[]
   members: FamilyMember[]
+  photoUrls?: Record<string, string>
   onAddRoom: (name: string) => void
   onRenameRoom: (room: Room, name: string) => void
   onDeleteRoom: (room: Room) => void
@@ -89,7 +90,7 @@ function TreeStorage({ storage, ...p }: { storage: Storage; room: Room } & Props
                 onCancel={() => setAdding(false)} />
             : <AddRow depth={2} label="추가" onClick={() => setAdding(true)} />}
           <CompartmentTree
-            storage={storage} items={items} members={p.members} baseDepth={2}
+            storage={storage} items={items} members={p.members} photoUrls={p.photoUrls} baseDepth={2}
             onCompartmentsChange={(c) => p.onCompartmentsChange(storage, c)}
             onDeleteCompartment={(id) => p.onDeleteCompartment(storage, id)}
             onAddItem={(cid, d) => p.onAddItem(storage, cid, d)}

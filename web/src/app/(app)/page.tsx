@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { keys } from '@/lib/keys'
 import { store } from '@/lib/store'
 import { syncNow, push } from '@/lib/sync'
-import { decryptField, encryptField, encryptBytes, importFDKCode } from '@/lib/crypto'
+import { decryptField, encryptField, importFDKCode } from '@/lib/crypto'
 import { GUEST_FAMILY_ID, GUEST_USER_ID, GUEST_FDK_CODE, guestSession } from '@/lib/guest'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/lib/useToast'
@@ -27,6 +27,7 @@ type BootData = {
   activity: Activity[]
   offline: boolean
   skippedCount: number
+  photoUrls: Record<string, string>
 }
 
 export default function AppHomePage() {
@@ -111,7 +112,13 @@ export default function AppHomePage() {
     )
     const decItems = decrypted.filter((d): d is DecItem => d !== null)
     const skippedCount = decrypted.length - decItems.length
-    setData({ familyId, userId, rooms, storages, decItems, members, activity, offline, skippedCount })
+    // 사진 objectURL — 재로드 시 일괄 재생성(개별 revoke 생략: 세션 수명, 개인 규모라 무해)
+    const photoUrls: Record<string, string> = {}
+    await Promise.all(decItems.filter((it) => it.photo_path === 'local').map(async (it) => {
+      const blob = await store.getPhoto(it.id)
+      if (blob) photoUrls[it.id] = URL.createObjectURL(blob)
+    }))
+    setData({ familyId, userId, rooms, storages, decItems, members, activity, offline, skippedCount, photoUrls })
   }
 
   // 앱으로 포커스가 돌아올 때 백그라운드로 재동기화(로컬 우선 — 실패해도 화면은 그대로 유지)
@@ -338,26 +345,19 @@ export default function AppHomePage() {
     if (!data) return
     const fdk = keys.getFDK()
     if (!fdk) return
-    const supabase = createClient()
     const now = new Date().toISOString()
     const newItems: DecItem[] = []
-    let photoFailed = false
+    const newUrls: Record<string, string> = {}
 
     for (const draft of drafts) {
       const itemId = crypto.randomUUID()
       let photo_path: string | null = null
       if (draft.photoFile) {
-        try {
-          const bytes = await downscaleImage(draft.photoFile)
-          const encBlob = await encryptBytes(fdk, bytes)
-          const path = `${data.familyId}/${itemId}/${crypto.randomUUID()}`
-          const { error: upErr } = await supabase.storage.from('item-photos').upload(path, encBlob)
-          if (upErr) throw upErr
-          photo_path = path
-        } catch {
-          // 사진 업로드는 네트워크가 필요 — 실패해도 물건 자체는 사진 없이 저장(브리프 지시)
-          photoFailed = true
-        }
+        const bytes = await downscaleImage(draft.photoFile)
+        const blob = new Blob([bytes], { type: 'image/jpeg' })
+        await store.putPhoto(itemId, blob)
+        photo_path = 'local'
+        newUrls[itemId] = URL.createObjectURL(blob)
       }
       const enc_name = await encryptField(fdk, draft.name)
       const enc_memo = draft.memo ? await encryptField(fdk, draft.memo) : null
@@ -382,11 +382,10 @@ export default function AppHomePage() {
       })
     }
 
-    setData((d) => d && { ...d, decItems: [...d.decItems, ...newItems] })
+    setData((d) => d && { ...d, decItems: [...d.decItems, ...newItems], photoUrls: { ...d.photoUrls, ...newUrls } })
 
     try {
       await push()
-      if (photoFailed) showToast('사진 업로드 실패 — 물건은 저장했어요')
     } catch {
       showToast('오프라인 — 나중에 동기화됩니다')
     }
@@ -401,8 +400,15 @@ export default function AppHomePage() {
     if (!stored) return
     const updated: Item = { ...stored, deleted_at: now, updated_at: now }
     await store.putLocal('items', updated, { dirty: true })
+    await store.delPhoto(item.id)
 
-    setData((d) => d && { ...d, decItems: d.decItems.filter((it) => it.id !== item.id) })
+    setData((d) => {
+      if (!d) return d
+      const photoUrls = { ...d.photoUrls }
+      const url = photoUrls[item.id]
+      if (url) { URL.revokeObjectURL(url); delete photoUrls[item.id] }
+      return { ...d, decItems: d.decItems.filter((it) => it.id !== item.id), photoUrls }
+    })
 
     try {
       await push()
@@ -462,6 +468,7 @@ export default function AppHomePage() {
 
   const treeProps = {
     rooms: data.rooms, storages: data.storages, decItems: data.decItems, members: data.members,
+    photoUrls: data.photoUrls,
     onAddRoom: handleAddRoom,
     onRenameRoom: (room: Room, name: string) => handleRoomUpdateMeta(room, { name }),
     onDeleteRoom: handleRoomDelete,
