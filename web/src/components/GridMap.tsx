@@ -32,6 +32,8 @@ function useSize(ref: React.RefObject<HTMLDivElement | null>) {
 export function GridMap(p: GridMapProps) {
   const [storageId, setStorageId] = useState<string | null>(null)
   const [focusFlash, setFocusFlash] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editRoomId, setEditRoomId] = useState<string | null>(null)
 
   // 검색 점프: 해당 수납장 화면으로 직행(소모형 prop)
   useEffect(() => {
@@ -49,14 +51,17 @@ export function GridMap(p: GridMapProps) {
   }, [focusFlash])
 
   const storage = storageId ? (p.storages.find((s) => s.id === storageId) ?? null) : null
+  const editRoom = editRoomId ? (p.rooms.find((r) => r.id === editRoomId) ?? null) : null
   if (storage) return <StorageScreen p={p} storage={storage} flash={focusFlash} onBack={() => setStorageId(null)} />
-  return <HomeCanvas p={p} onOpenStorage={setStorageId} />
+  if (editRoom) return <RoomEditView p={p} room={editRoom} onBack={() => setEditRoomId(null)} />
+  return <HomeCanvas p={p} editing={editing} onToggleEditing={() => setEditing((e) => !e)} onOpenStorage={setStorageId} onEditRoom={setEditRoomId} />
 }
 
 // 탑뷰: 우리집 — 방 타일 + 수납장 %-비례 오버레이
-function HomeCanvas({ p, onOpenStorage }: { p: GridMapProps; onOpenStorage: (id: string) => void }) {
+function HomeCanvas({ p, editing, onToggleEditing, onOpenStorage, onEditRoom }: {
+  p: GridMapProps; editing: boolean; onToggleEditing: () => void; onOpenStorage: (id: string) => void; onEditRoom: (id: string) => void
+}) {
   const [adding, setAdding] = useState(false)
-  const [editing, setEditing] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const { w, h } = useSize(wrapRef)
@@ -70,10 +75,11 @@ function HomeCanvas({ p, onOpenStorage }: { p: GridMapProps; onOpenStorage: (id:
           ? <InlineInput depth={0} placeholder="방 이름 (예: 안방, 거실)" onSubmit={(n) => { p.onAddRoom(n); setAdding(false) }} onCancel={() => setAdding(false)} />
           : <AddRow depth={0} label="방 추가" onClick={() => setAdding(true)} />}
         <button type="button" className={`gmap-edit${editing ? ' on' : ''}`}
-          onClick={() => { setEditing((e) => !e); setSelectedId(null) }}>
+          onClick={() => { onToggleEditing(); setSelectedId(null) }}>
           {editing ? '완료' : '편집'}
         </button>
       </div>
+      {editing && <div className="gmap-hint">방을 한 번 더 탭하면 확대해서 수납장을 편집할 수 있어요</div>}
       <div className="gmap-scroll" ref={wrapRef}>
         {cell > 0 && (
           <div className="gmap" style={{ height: rows * cell, backgroundSize: `${cell}px ${cell}px` }}>
@@ -86,7 +92,7 @@ function HomeCanvas({ p, onOpenStorage }: { p: GridMapProps; onOpenStorage: (id:
                   cell={cell} cols={COLS} minW={ROOM_MIN} minH={ROOM_MIN}
                   editing={editing} selected={selectedId === room.id}
                   className="gm-tile gm-room"
-                  onSelect={() => setSelectedId(room.id)}
+                  onSelect={() => { if (selectedId === room.id) onEditRoom(room.id); else setSelectedId(room.id) }}
                   onOpen={() => {}} // 보기에서 방 탭은 무동작 — 방은 레이아웃일 뿐(스펙 §1)
                   onCommit={(next) => p.onRoomGeometry(room, next)}>
                   <span className="gm-name">{room.name}</span>
@@ -114,6 +120,48 @@ function HomeCanvas({ p, onOpenStorage }: { p: GridMapProps; onOpenStorage: (id:
       </div>
       <div className="gmap-foot">
         방 {p.rooms.length} · 수납장 {p.storages.length} · 물건 {p.decItems.length}개
+      </div>
+    </div>
+  )
+}
+
+// 방 확대 편집: 수납장 이동/리사이즈(방 안으로 클램프) + 방 이름수정/삭제 + 수납장 추가. ‹로 탑뷰 편집 복귀.
+function RoomEditView({ p, room, onBack }: { p: GridMapProps; room: Room; onBack: () => void }) {
+  const [adding, setAdding] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const { w } = useSize(wrapRef)
+  const inner = roomInnerGrid(room)
+  const cell = w / inner.cols
+  const storages = p.storages.filter((s) => s.room_id === room.id)
+  return (
+    <div className="gmap-page">
+      <DrillHeader name={room.name} onBack={onBack}
+        onRename={(n) => p.onRenameRoom(room, n)}
+        deleteTitle="방 삭제" deleteMessage={`'${room.name}' 방과 그 안의 수납장·물건이 함께 삭제됩니다`}
+        onDelete={() => p.onDeleteRoom(room)} />
+      <div className="gmap-bar">
+        {adding
+          ? <InlineInput depth={0} placeholder="수납장 이름 (예: 서랍장1)" onSubmit={(n) => { p.onAddStorage(room, n); setAdding(false) }} onCancel={() => setAdding(false)} />
+          : <AddRow depth={0} label="수납장 추가" onClick={() => setAdding(true)} />}
+      </div>
+      <div className="gmap-scroll" ref={wrapRef}>
+        {cell > 0 && (
+          <div className="gmap" style={{ height: inner.rows * cell, backgroundSize: `${cell}px ${cell}px` }}>
+            {storages.length === 0 && <div className="gmap-empty">수납장이 없어요 — 위 ‘수납장 추가’로 시작해보세요</div>}
+            {storages.map((s) => (
+              <EditableTile key={s.id} rect={storageRect(s)}
+                cell={cell} cols={inner.cols} minW={1} minH={1} maxRows={inner.rows}
+                editing selected={selectedId === s.id}
+                className="gm-tile gm-storage"
+                onSelect={() => setSelectedId(s.id)}
+                onOpen={() => {}}
+                onCommit={(next) => p.onStorageGeometry(s, next)}>
+                <span className="gm-name">{s.name}</span>
+              </EditableTile>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -152,9 +200,9 @@ function StorageScreen({ p, storage, flash, onBack }: {
 }
 
 // 편집 가능 타일: 보기=클릭 진입 / 편집=드래그 이동(셀 스냅)·선택 후 코너 핸들 리사이즈.
-// 세로는 아래로 제한 없음(그리드가 콘텐츠 따라 늘어남 — 스펙 §2).
-function EditableTile({ rect, cell, cols, minW, minH, editing, selected, className, onSelect, onOpen, onCommit, children }: {
-  rect: CellRect; cell: number; cols: number; minW: number; minH: number
+// 세로는 탑뷰=아래 무제한(행 확장), 방 확대=maxRows로 방 안 클램프.
+function EditableTile({ rect, cell, cols, minW, minH, maxRows, editing, selected, className, onSelect, onOpen, onCommit, children }: {
+  rect: CellRect; cell: number; cols: number; minW: number; minH: number; maxRows?: number
   editing: boolean; selected: boolean; className: string
   onSelect: () => void; onOpen: () => void; onCommit: (next: CellRect) => void
   children: React.ReactNode
@@ -165,7 +213,7 @@ function EditableTile({ rect, cell, cols, minW, minH, editing, selected, classNa
   const clampMove = (r: CellRect): CellRect => ({
     ...r,
     x: Math.min(Math.max(r.x, 0), cols - r.w),
-    y: Math.max(r.y, 0), // 아래는 무제한(행 자동 확장)
+    y: maxRows ? Math.min(Math.max(r.y, 0), maxRows - r.h) : Math.max(r.y, 0),
   })
 
   function start(mode: 'move' | 'resize', e: React.PointerEvent) {
@@ -188,7 +236,7 @@ function EditableTile({ rect, cell, cols, minW, minH, editing, selected, classNa
         : {
             ...rect,
             w: Math.min(Math.max(rect.w + dx, minW), cols - rect.x),
-            h: Math.max(rect.h + dy, minH),
+            h: maxRows ? Math.min(Math.max(rect.h + dy, minH), maxRows - rect.y) : Math.max(rect.h + dy, minH),
           },
     })
   }

@@ -253,6 +253,7 @@ header{
 /* 편집 모드: 셀 스냅 드래그 이동 + 44px 코너 핸들 리사이즈 */
 .gmap-bar{display:flex;align-items:center;gap:8px}
 .gmap-bar .tadd-row,.gmap-bar .tadd-form{flex:1}
+.gmap-hint{font-size:12px;color:var(--ink-soft);padding:2px 4px 6px}
 .gmap-edit{flex-shrink:0;font-size:13px;font-weight:600;padding:8px 14px;border-radius:8px;background:var(--panel);color:var(--ink-soft)}
 .gmap-edit.on{background:var(--accent);color:#fff}
 .gm-edit{touch-action:none;cursor:move}
