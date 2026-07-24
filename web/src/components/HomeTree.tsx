@@ -64,15 +64,16 @@ function TreeRoom({ room, ...p }: { room: Room } & Props) {
         expandable={storages.length > 0}
         expanded={expanded}
         onToggle={() => { setExpanded((e) => !e); p.onSelectRoom?.(focused ? null : room.id) }}
+        onAdd={() => { setAdding(true); setExpanded(true) }}
         onRename={(n) => p.onRenameRoom(room, n)}
         deleteTitle="방 삭제" deleteMessage={`'${room.name}' 방과 그 안의 수납장·물건이 함께 삭제됩니다`}
         onDelete={() => p.onDeleteRoom(room)}
       />
       {expanded && (
         <>
-          {adding
-            ? <InlineInput depth={1} placeholder="수납장 이름 (예: 서랍장1)" onSubmit={(n) => { p.onAddStorage(room, n); setAdding(false) }} onCancel={() => setAdding(false)} />
-            : <AddRow depth={1} label="수납장 추가" onClick={() => setAdding(true)} />}
+          {adding && (
+            <InlineInput depth={1} placeholder="수납장 이름 (예: 서랍장1)" onSubmit={(n) => { p.onAddStorage(room, n); setAdding(false) }} onCancel={() => setAdding(false)} />
+          )}
           {storages.map((s) => <TreeStorage key={s.id} storage={s} {...p} />)}
         </>
       )}
