@@ -231,12 +231,18 @@ header{
 .gm-name{font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gm-storage{background:var(--surface)}
 .gm-room{overflow:hidden}
-/* 방 이름 워터마크 — 중앙·은은·수납장(z1) 아래(스펙: 겹침 시 가려짐 수용, 헤더·확대가 보완) */
+/* 방 이름 — 기본 숨김(겹침 소음 제거, 이름의 원 소스는 옆 목록).
+   호버(데스크톱)·선택(hh-sel — 모바일 탭)·편집 선택(gm-selected) 시에만 중앙 표시, 이때는 수납장 위(z2)로. */
 .gm-room > .gm-name{
-  position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   padding:4px;pointer-events:none;overflow:hidden;
   font-size:15px;font-weight:700;color:var(--ink-soft);
+  opacity:0;z-index:2;transition:opacity .12s;
 }
+.gm-room:hover > .gm-name,
+.gm-room.hh-sel > .gm-name,
+.gm-room.gm-selected > .gm-name{opacity:1}
+@media (prefers-reduced-motion:reduce){.gm-room > .gm-name{transition:none}}
 .gm-sto{
   position:absolute;z-index:1;display:flex;align-items:flex-start;
   background:var(--surface);border:1px solid var(--line);border-radius:6px;
