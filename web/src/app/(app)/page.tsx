@@ -595,7 +595,7 @@ export default function AppHomePage() {
       ) : (
         <div className="main">
           <GridMap {...treeProps}
-            focusStorageId={mapFocusId} onConsumeFocus={() => setMapFocusId(null)}
+            homeRoomId={null} onSelectRoom={() => {}}
             onRoomGeometry={handleRoomGeometry} onStorageGeometry={handleStorageGeometry} />
         </div>
       )}

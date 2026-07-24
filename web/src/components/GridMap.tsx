@@ -6,11 +6,10 @@ import { COLS, ROOM_MIN, type CellRect, contentRows, roomInnerGrid, storageRect 
 import { AddRow, InlineInput } from './CompartmentTree'
 import type { HomeTreeProps } from './HomeTree'
 import { DrillHeader } from './TreeRow'
-import { StoragePane } from './StoragePane'
 
 export type GridMapProps = HomeTreeProps & {
-  focusStorageId: string | null
-  onConsumeFocus: () => void
+  homeRoomId: string | null
+  onSelectRoom: (id: string | null) => void
   onRoomGeometry: (room: Room, next: CellRect) => void
   onStorageGeometry: (storage: Storage, next: CellRect) => void
 }
@@ -29,38 +28,19 @@ function useSize(ref: React.RefObject<HTMLDivElement | null>) {
   return size
 }
 
-// 도식화: 2레벨 — 탑뷰(방+수납장 오버레이) / 수납장 화면(아코디언). 노드가 동기화로 사라지면 자동 탑뷰 복귀.
+// 도식화: 탑뷰(방+수납장 오버레이) / 방 확대 편집. 노드가 동기화로 사라지면 자동 탑뷰 복귀.
 export function GridMap(p: GridMapProps) {
-  const [storageId, setStorageId] = useState<string | null>(null)
-  const [focusFlash, setFocusFlash] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editRoomId, setEditRoomId] = useState<string | null>(null)
 
-  // 검색 점프: 해당 수납장 화면으로 직행(소모형 prop)
-  useEffect(() => {
-    if (!p.focusStorageId) return
-    const jump = () => { setStorageId(p.focusStorageId); setFocusFlash(true) }
-    jump()
-    p.onConsumeFocus()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [p.focusStorageId])
-
-  useEffect(() => {
-    if (!focusFlash) return
-    const t = setTimeout(() => setFocusFlash(false), 1600)
-    return () => clearTimeout(t)
-  }, [focusFlash])
-
-  const storage = storageId ? (p.storages.find((s) => s.id === storageId) ?? null) : null
   const editRoom = editRoomId ? (p.rooms.find((r) => r.id === editRoomId) ?? null) : null
-  if (storage) return <StoragePane p={p} storage={storage} flash={focusFlash} onBack={() => setStorageId(null)} />
   if (editRoom) return <RoomEditView p={p} room={editRoom} onBack={() => setEditRoomId(null)} />
-  return <HomeCanvas p={p} editing={editing} onToggleEditing={() => setEditing((e) => !e)} onOpenStorage={setStorageId} onEditRoom={setEditRoomId} />
+  return <HomeCanvas p={p} editing={editing} onToggleEditing={() => setEditing((e) => !e)} onEditRoom={setEditRoomId} />
 }
 
 // 탑뷰: 우리집 — 방 타일 + 수납장 %-비례 오버레이
-function HomeCanvas({ p, editing, onToggleEditing, onOpenStorage, onEditRoom }: {
-  p: GridMapProps; editing: boolean; onToggleEditing: () => void; onOpenStorage: (id: string) => void; onEditRoom: (id: string) => void
+function HomeCanvas({ p, editing, onToggleEditing, onEditRoom }: {
+  p: GridMapProps; editing: boolean; onToggleEditing: () => void; onEditRoom: (id: string) => void
 }) {
   const [adding, setAdding] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -94,9 +74,9 @@ function HomeCanvas({ p, editing, onToggleEditing, onOpenStorage, onEditRoom }: 
                 <EditableTile key={room.id} rect={{ x: room.x, y: room.y, w: room.w, h: room.h }}
                   cell={cell} cols={COLS} minW={ROOM_MIN} minH={ROOM_MIN}
                   editing={editing} selected={selectedId === room.id}
-                  className="gm-tile gm-room"
+                  className={`gm-tile gm-room${p.homeRoomId === room.id ? ' hh-sel' : ''}`}
                   onSelect={() => { if (selectedId === room.id) onEditRoom(room.id); else setSelectedId(room.id) }}
-                  
+                  onOpen={() => p.onSelectRoom(p.homeRoomId === room.id ? null : room.id)}
                   onCommit={(next) => p.onRoomGeometry(room, next)}>
                   <span className="gm-name">{room.name}</span>
                   {/* 수납장 오버레이 — 방-로컬 셀을 방 사각형에 %-비례 배치 */}
@@ -122,7 +102,7 @@ function HomeCanvas({ p, editing, onToggleEditing, onOpenStorage, onEditRoom }: 
                     }
                     return (
                       <button key={s.id} type="button" className="gm-sto" style={st}
-                        onClick={(e) => { e.stopPropagation(); onOpenStorage(s.id) }}>
+                        onClick={(e) => { e.stopPropagation(); p.onOpenStorage?.(s.id) }}>
                         <span>{s.name}</span>
                       </button>
                     )
@@ -132,9 +112,6 @@ function HomeCanvas({ p, editing, onToggleEditing, onOpenStorage, onEditRoom }: 
             })}
           </div>
         )}
-      </div>
-      <div className="gmap-foot">
-        방 {p.rooms.length} · 수납장 {p.storages.length} · 물건 {p.decItems.length}개
       </div>
     </div>
   )
@@ -183,12 +160,12 @@ function RoomEditView({ p, room, onBack }: { p: GridMapProps; room: Room; onBack
 }
 
 // 편집 가능 타일: 편집=드래그 이동(셀 스냅)·선택 후 코너 핸들 리사이즈.
-// 보기 모드에선 정적 컨테이너(내부 수납장 버튼이 인터랙션 담당 — 탑뷰 방 탭은 무동작).
+// 보기 모드에선 onOpen이 있을 때만 탭 가능(탑뷰 방 탭=선택 토글, 그 외엔 정적 컨테이너).
 // 세로는 탑뷰=아래 무제한(행 확장), 방 확대=maxRows로 방 안 클램프.
-function EditableTile({ rect, cell, cellH, cols, minW, minH, maxRows, editing, selected, className, onSelect, onCommit, children }: {
+function EditableTile({ rect, cell, cellH, cols, minW, minH, maxRows, editing, selected, className, onSelect, onOpen, onCommit, children }: {
   rect: CellRect; cell: number; cellH?: number; cols: number; minW: number; minH: number; maxRows?: number
   editing: boolean; selected: boolean; className: string
-  onSelect: () => void; onCommit: (next: CellRect) => void
+  onSelect: () => void; onOpen?: () => void; onCommit: (next: CellRect) => void
   children: React.ReactNode
 }) {
   const ch = cellH ?? cell
@@ -236,13 +213,14 @@ function EditableTile({ rect, cell, cellH, cols, minW, minH, maxRows, editing, s
   return (
     <div className={`${className}${editing ? ' gm-edit' : ''}${selected ? ' gm-selected' : ''}`}
       style={{ left: shown.x * cell, top: shown.y * ch, width: shown.w * cell, height: shown.h * ch }}
-      role={editing ? 'button' : undefined} tabIndex={editing ? 0 : undefined}
+      role={editing || onOpen ? 'button' : undefined} tabIndex={editing || onOpen ? 0 : undefined}
       onPointerDown={(e) => start('move', e)} onPointerMove={move} onPointerUp={end} onPointerCancel={() => setDrag(null)}
       onClick={(e) => {
         e.stopPropagation()
         if (moved.current) { moved.current = false; return }
-        if (editing) onSelect()
+        if (editing) onSelect(); else onOpen?.()
       }}
+      onKeyDown={(e) => { if (e.key === 'Enter' && !editing) onOpen?.() }}
     >
       {children}
       {editing && selected && (
