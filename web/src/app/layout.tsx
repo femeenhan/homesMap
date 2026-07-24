@@ -17,6 +17,10 @@ export const metadata: Metadata = {
   title: "홈즈맵",
   description: "우리 집 물건 지도",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/apple-touch-icon.png", // iOS 홈 화면 아이콘 — 이게 없으면 스크린샷/구 아이콘이 잡힘
+  },
 };
 
 export default function RootLayout({
