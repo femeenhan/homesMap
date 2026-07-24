@@ -12,10 +12,12 @@ import { Header } from '@/components/Header'
 import { GridMap } from '@/components/GridMap'
 import { HomeTree } from '@/components/HomeTree'
 import { DrillDown } from '@/components/DrillDown'
+import { Modal } from '@/components/Modal'
 import { useIsMobile } from '@/lib/useIsMobile'
 import type { Room, Storage, Item, DecItem, FamilyMember, Activity, ItemDraft, Compartment } from '@/lib/types'
 import { descendantIds } from '@/lib/compartments'
 import { COLS, ROOM_DEFAULT, STORAGE_DEFAULT, autoPlace, roomInnerGrid, storageRect, migrateLegacyGeometry, type CellRect } from '@/lib/grid'
+import { buildBackup, parseBackup, toBase64, fromBase64, type Backup, type BackupItem } from '@/lib/backup'
 
 type BootData = {
   familyId: string
@@ -36,6 +38,7 @@ export default function AppHomePage() {
   const [view, setView] = useState<'list' | 'map'>('list') // 목록(카테고리 트리)이 기본, 도식화(지도)는 보조
   const isMobile = useIsMobile()
   const [mapFocusId, setMapFocusId] = useState<string | null>(null)
+  const [pendingImport, setPendingImport] = useState<Backup | null>(null)
   const { message: toastMsg, showToast } = useToast()
 
   // 검색 결과 클릭: 도식화로 전환해 해당 수납장 확대(L2)로 점프
@@ -62,6 +65,7 @@ export default function AppHomePage() {
     await store.setMeta('familyId', GUEST_FAMILY_ID)
     await store.setMeta('userId', GUEST_USER_ID)
     await loadLocalData(GUEST_FAMILY_ID, GUEST_USER_ID, false)
+    navigator.storage?.persist?.().catch(() => {})
   }
 
   async function loadLocalData(familyId: string, userId: string, offline: boolean) {
@@ -444,6 +448,76 @@ export default function AppHomePage() {
     }
   }
 
+  // ---------- 설정: 백업 내보내기/가져오기 ----------
+
+  async function handleExport() {
+    if (!data) return
+    const items: BackupItem[] = await Promise.all(data.decItems.map(async (it) => {
+      const base: BackupItem = {
+        id: it.id, storage_id: it.storage_id, compartment_id: it.compartment_id,
+        name: it.name, memo: it.memo, created_at: it.created_at,
+      }
+      if (it.photo_path === 'local') {
+        const blob = await store.getPhoto(it.id)
+        if (blob) base.photo = toBase64(new Uint8Array(await blob.arrayBuffer()))
+      }
+      return base
+    }))
+    const json = buildBackup(data.rooms, data.storages, items, new Date().toISOString())
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `homes-map-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    showToast('백업 파일을 내려받았어요')
+  }
+
+  async function handleImportFile(file: File) {
+    try {
+      setPendingImport(parseBackup(await file.text()))
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : '백업 파일을 읽지 못했어요')
+    }
+  }
+
+  // 확인 후 실행: 현재 가족 데이터만 하드 삭제 → 파일 내용 재구성(재암호화·family_id 스탬프) → 리로드
+  async function applyImport(backup: Backup) {
+    if (!data) return
+    const fdk = keys.getFDK()
+    if (!fdk) return
+    const now = new Date().toISOString()
+    const [oldRooms, oldStorages, oldItems] = await Promise.all([
+      store.getAll<Room>('rooms'), store.getAll<Storage>('storages'), store.getAll<Item>('items'),
+    ])
+    const mine = <T extends { family_id: string }>(rows: T[]) => rows.filter((r) => r.family_id === data.familyId)
+    await Promise.all([
+      ...mine(oldItems).map(async (it) => { await store.removeRow('items', it.id); await store.delPhoto(it.id) }),
+      ...mine(oldRooms).map((r) => store.removeRow('rooms', r.id)),
+      ...mine(oldStorages).map((s) => store.removeRow('storages', s.id)),
+    ])
+    for (const r of backup.rooms) await store.putLocal('rooms', { ...r, family_id: data.familyId, updated_at: now, deleted_at: null }, { dirty: false })
+    for (const s of backup.storages) await store.putLocal('storages', { ...s, family_id: data.familyId, updated_at: now, deleted_at: null }, { dirty: false })
+    for (const it of backup.items) {
+      let photo_path: string | null = null
+      if (it.photo) {
+        await store.putPhoto(it.id, new Blob([fromBase64(it.photo)], { type: 'image/jpeg' }))
+        photo_path = 'local'
+      }
+      const row: Item = {
+        id: it.id, family_id: data.familyId, storage_id: it.storage_id,
+        compartment_id: it.compartment_id ?? null,
+        enc_name: await encryptField(fdk, it.name),
+        enc_memo: it.memo ? await encryptField(fdk, it.memo) : null,
+        emoji: '📦', photo_path, created_by: data.userId,
+        created_at: it.created_at, updated_at: now, deleted_at: null,
+      }
+      await store.putLocal('items', row, { dirty: false })
+    }
+    await loadLocalData(data.familyId, data.userId, false)
+    showToast('백업을 가져왔어요')
+  }
+
   if (error) {
     return (
       <div
@@ -488,6 +562,8 @@ export default function AppHomePage() {
         storages={data.storages}
         rooms={data.rooms}
         onSearchPick={handleSearchPick}
+        onExport={handleExport}
+        onImportFile={handleImportFile}
       />
       {data.offline && <div className="offline-notice">오프라인 — 저장된 데이터로 표시 중</div>}
       {data.skippedCount > 0 && (
@@ -507,6 +583,13 @@ export default function AppHomePage() {
             focusStorageId={mapFocusId} onConsumeFocus={() => setMapFocusId(null)}
             onRoomGeometry={handleRoomGeometry} onStorageGeometry={handleStorageGeometry} />
         </div>
+      )}
+      {pendingImport && (
+        <Modal title="백업 가져오기"
+          message={`현재 데이터를 백업 파일 내용(방 ${pendingImport.rooms.length} · 수납장 ${pendingImport.storages.length} · 물건 ${pendingImport.items.length})으로 교체합니다. 되돌릴 수 없어요.`}
+          okText="교체"
+          onCancel={() => setPendingImport(null)}
+          onConfirm={() => { const b = pendingImport; setPendingImport(null); if (b) void applyImport(b) }} />
       )}
       <div className={`toast${toastMsg ? ' show' : ''}`}>{toastMsg}</div>
     </>

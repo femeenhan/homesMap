@@ -47,6 +47,9 @@ export const store = {
   delPhoto(itemId: string): Promise<void> {
     return idb.del('photos', itemId)
   },
+  removeRow(table: Table, id: string): Promise<void> {
+    return idb.del(table, id)
+  },
   // 계정 전환 감지 시 사용: 5개 데이터 스토어 + 사진 스토어를 비우고 lastSync만 리셋.
   // wrappedKey는 지우지 않음 — 현재 잠금해제된 세션이 소유한 값이라 계정 전환과 무관.
   async clearFamilyData(): Promise<void> {
