@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Room, Storage, DecItem, FamilyMember, Compartment } from '@/lib/types'
 import { InlineInput, AddRow } from './CompartmentTree'
 import { TreeRow } from './TreeRow'
@@ -24,6 +24,8 @@ type Props = {
   onAddItem: (storage: Storage, compartmentId: string | null, draft: AddDraft) => void | Promise<void>
   onDeleteItem: (item: DecItem) => void
   onOpenStorage?: (id: string) => void
+  focusRoomId?: string | null
+  onSelectRoom?: (id: string | null) => void
 }
 
 // 집 전체 아코디언: 방 → 수납장 → 칸(무한중첩) → 물건. 카테고리화의 본체(목록 뷰).
@@ -43,13 +45,25 @@ export function HomeTree(p: Props) {
 function TreeRoom({ room, ...p }: { room: Room } & Props) {
   const [expanded, setExpanded] = useState(false)
   const [adding, setAdding] = useState(false)
+  const rowRef = useRef<HTMLDivElement>(null)
   const storages = p.storages.filter((s) => s.room_id === room.id)
+  const focused = p.focusRoomId === room.id
+  // 지도에서 방 선택 시 펼침+스크롤 (동기 setState 아닌 지역 함수 래핑 — lint 규칙)
+  useEffect(() => {
+    if (!focused) return
+    const openIt = () => {
+      setExpanded(true)
+      rowRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }
+    openIt()
+  }, [focused])
   return (
-    <div className="tnode">
+    <div className="tnode" ref={rowRef}>
       <TreeRow
-        depth={0} levelClass="lv-room" icon="folder" name={room.name} count={storages.length}
+        depth={0} levelClass={`lv-room${focused ? ' sel' : ''}`} icon="folder" name={room.name} count={storages.length}
         expandable={storages.length > 0}
-        expanded={expanded} onToggle={() => setExpanded((e) => !e)}
+        expanded={expanded}
+        onToggle={() => { setExpanded((e) => !e); p.onSelectRoom?.(focused ? null : room.id) }}
         onRename={(n) => p.onRenameRoom(room, n)}
         deleteTitle="방 삭제" deleteMessage={`'${room.name}' 방과 그 안의 수납장·물건이 함께 삭제됩니다`}
         onDelete={() => p.onDeleteRoom(room)}

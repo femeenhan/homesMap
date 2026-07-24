@@ -11,10 +11,8 @@ import { useToast } from '@/lib/useToast'
 import { Header } from '@/components/Header'
 import { GridMap } from '@/components/GridMap'
 import { HomeTree } from '@/components/HomeTree'
-import { DrillDown } from '@/components/DrillDown'
 import { StoragePane } from '@/components/StoragePane'
 import { Modal } from '@/components/Modal'
-import { useIsMobile } from '@/lib/useIsMobile'
 import type { Room, Storage, Item, DecItem, FamilyMember, Activity, ItemDraft, Compartment } from '@/lib/types'
 import { descendantIds } from '@/lib/compartments'
 import { COLS, ROOM_DEFAULT, STORAGE_DEFAULT, autoPlace, roomInnerGrid, storageRect, migrateLegacyGeometry, type CellRect } from '@/lib/grid'
@@ -36,17 +34,22 @@ type BootData = {
 export default function AppHomePage() {
   const [data, setData] = useState<BootData | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [view, setView] = useState<'list' | 'map'>('list') // 목록(카테고리 트리)이 기본, 도식화(지도)는 보조
-  const isMobile = useIsMobile()
-  const [mapFocusId, setMapFocusId] = useState<string | null>(null)
+  const [homeRoomId, setHomeRoomId] = useState<string | null>(null)
   const [openStorageId, setOpenStorageId] = useState<string | null>(null)
+  const [searchFlash, setSearchFlash] = useState(false)
   const [pendingImport, setPendingImport] = useState<Backup | null>(null)
   const { message: toastMsg, showToast } = useToast()
 
-  // 검색 결과 클릭: 도식화로 전환해 해당 수납장 화면으로 점프
+  useEffect(() => {
+    if (!searchFlash) return
+    const t = setTimeout(() => setSearchFlash(false), 1600)
+    return () => clearTimeout(t)
+  }, [searchFlash])
+
+  // 검색 결과 클릭: 해당 수납장 화면 + 하이라이트
   function handleSearchPick(storageId: string) {
-    setView('map')
-    setMapFocusId(storageId)
+    setOpenStorageId(storageId)
+    setSearchFlash(true)
   }
 
   useEffect(() => {
@@ -561,6 +564,8 @@ export default function AppHomePage() {
     onAddItem: handleTreeItemAdd,
     onDeleteItem: handleItemDelete,
     onOpenStorage: setOpenStorageId,
+    focusRoomId: homeRoomId,
+    onSelectRoom: setHomeRoomId,
   }
   const openStorage = openStorageId ? (data.storages.find((s) => s.id === openStorageId) ?? null) : null
 
@@ -578,25 +583,20 @@ export default function AppHomePage() {
       {data.skippedCount > 0 && (
         <div className="offline-notice">일부 물건({data.skippedCount}개)을 해독하지 못해 표시하지 않았어요.</div>
       )}
-      <div className="viewtabs">
-        <button type="button" className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>목록</button>
-        <button type="button" className={view === 'map' ? 'active' : ''} onClick={() => setView('map')}>도식화</button>
-      </div>
-      {view === 'list' ? (
-        openStorage ? (
-          <div className="main">
-            <StoragePane p={treeProps} storage={openStorage} onBack={() => setOpenStorageId(null)} />
-          </div>
-        ) : (
-          <div className="tree-view">
-            {isMobile ? <DrillDown {...treeProps} /> : <HomeTree {...treeProps} />}
-          </div>
-        )
-      ) : (
+      {openStorage ? (
         <div className="main">
-          <GridMap {...treeProps}
-            homeRoomId={null} onSelectRoom={() => {}}
-            onRoomGeometry={handleRoomGeometry} onStorageGeometry={handleStorageGeometry} />
+          <StoragePane p={treeProps} storage={openStorage} flash={searchFlash} onBack={() => setOpenStorageId(null)} />
+        </div>
+      ) : (
+        <div className="home-hybrid">
+          <div className="hh-map">
+            <GridMap {...treeProps}
+              homeRoomId={homeRoomId} onSelectRoom={setHomeRoomId}
+              onRoomGeometry={handleRoomGeometry} onStorageGeometry={handleStorageGeometry} />
+          </div>
+          <div className="hh-list">
+            <HomeTree {...treeProps} />
+          </div>
         </div>
       )}
       {pendingImport && (

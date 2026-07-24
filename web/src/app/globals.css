@@ -118,13 +118,21 @@ header{
 }
 .activity-list li b{color:var(--ink)}
 
-/* ---------- 뷰 토글 ---------- */
-.viewtabs{display:flex;gap:6px;padding:10px 16px;background:var(--paper);border-bottom:1px solid var(--line);flex-shrink:0}
-.viewtabs button{padding:7px 16px;border-radius:8px;font-size:13.5px;font-weight:700;background:var(--panel);color:var(--ink-soft);border:1px solid transparent}
-.viewtabs button.active{background:var(--accent-soft);color:var(--accent-ink);border-color:var(--accent)}
+/* ---------- 하이브리드 홈: 콤팩트 탑뷰 + 목록 ---------- */
+.home-hybrid{flex:1;min-height:0;display:flex;flex-direction:column}
+.hh-map{height:35vh;min-height:180px;display:flex;border-bottom:1px solid var(--line)}
+.hh-list{flex:1;min-height:0;overflow-y:auto;padding:10px 12px}
+@media (min-width:768px){
+  .home-hybrid{flex-direction:row}
+  .hh-map{height:auto;width:55%;border-bottom:none;border-right:1px solid var(--line)}
+}
+.gm-room.hh-sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+/* 모바일: 편집 모드·방 확대(RoomEditView) 중엔 지도 영역을 키워 조작 공간 확보 */
+@media (max-width:767px){
+  .hh-map:has(.gmap-edit.on),.hh-map:has(.drill-head){height:60vh}
+}
 
-/* ---------- 목록(트리) 뷰 — 깔끔한 파일트리 스타일 ---------- */
-.tree-view{flex:1;min-height:0;overflow-y:auto;padding:16px 12px}
+/* ---------- 목록(트리) — 깔끔한 파일트리 스타일 ---------- */
 .home-tree{max-width:620px;margin:0 auto;display:flex;flex-direction:column}
 .tree-empty{color:var(--ink-soft);font-size:13px;text-align:center;padding:24px 0}
 .tnode{display:flex;flex-direction:column}
