@@ -36,6 +36,7 @@ export default function AppHomePage() {
   const [homeRoomId, setHomeRoomId] = useState<string | null>(null)
   const [focusStorageId, setFocusStorageId] = useState<string | null>(null)
   const [searchFlash, setSearchFlash] = useState(false)
+  const [storageClipboard, setStorageClipboard] = useState<Storage | null>(null) // 수납장 복사 스냅샷
   const [pendingImport, setPendingImport] = useState<Backup | null>(null)
   const { message: toastMsg, showToast } = useToast()
 
@@ -252,28 +253,37 @@ export default function AppHomePage() {
     void recordActivity(data.familyId, data.userId, 'storage_added', { roomName: room.name, storageName: name })
   }
 
-  // 수납장 복사: 칸 구조까지(물건 제외), 같은 방 빈 자리에 배치
-  async function handleDuplicateStorage(storage: Storage) {
-    if (!data) return
-    const room = data.rooms.find((r) => r.id === storage.room_id)
-    if (!room) return
+  // 수납장 복사(앱 클립보드): ⋯ 복사 → 아무 방의 ⋯ 붙여넣기. 스냅샷이라 원본이 지워져도 붙여넣기 가능.
+  function handleCopyStorage(storage: Storage) {
+    setStorageClipboard(storage)
+    showToast(`'${storage.name}' 복사됨 — 원하는 방의 ⋯ → 붙여넣기`)
+  }
+
+  // 붙여넣기: 칸 구조까지(물건 제외), 대상 방 빈 자리에 배치. 방 크기에 맞게 타일 클램프.
+  async function handlePasteStorage(room: Room) {
+    if (!data || !storageClipboard) return
+    const src = storageClipboard
     const inner = roomInnerGrid(room)
-    const r = storageRect(storage)
-    const sib = data.storages.filter((s) => s.room_id === storage.room_id).map(storageRect)
-    const pos = autoPlace(sib, { w: r.w, h: r.h }, inner.cols)
+    const r = storageRect(src)
+    const w = Math.min(r.w, inner.cols)
+    const h = Math.min(r.h, inner.rows)
+    const sib = data.storages.filter((s) => s.room_id === room.id).map(storageRect)
+    const pos = autoPlace(sib, { w, h }, inner.cols)
     const row: Storage = {
-      ...storage,
+      ...src,
       id: crypto.randomUUID(),
-      name: `${storage.name} 복사`,
+      room_id: room.id,
+      name: `${src.name} 복사`,
       x: pos.x,
-      y: Math.min(pos.y, Math.max(0, inner.rows - r.h)),
-      compartments: duplicateCompartments(storage.compartments ?? []),
+      y: Math.min(pos.y, Math.max(0, inner.rows - h)),
+      w, h,
+      compartments: duplicateCompartments(src.compartments ?? []),
       updated_at: new Date().toISOString(),
       deleted_at: null,
     }
     await store.putLocal('storages', row, { dirty: true })
     setData((d) => d && { ...d, storages: [...d.storages, row] })
-    showToast(`'${row.name}' 추가됨 — 이름은 ⋯에서 바꿀 수 있어요`)
+    showToast(`'${room.name}'에 붙여넣었어요 — 이름은 ⋯에서 바꿀 수 있어요`)
     try { await push() } catch { showToast('오프라인 — 나중에 동기화됩니다') }
   }
 
@@ -599,7 +609,9 @@ export default function AppHomePage() {
     focusStorageId,
     storageFlash: searchFlash,
     onFocusStorage: setFocusStorageId,
-    onDuplicateStorage: handleDuplicateStorage,
+    onCopyStorage: handleCopyStorage,
+    canPasteStorage: storageClipboard !== null,
+    onPasteStorage: handlePasteStorage,
   }
 
   return (

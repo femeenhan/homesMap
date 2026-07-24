@@ -29,7 +29,9 @@ type Props = {
   focusStorageId?: string | null
   storageFlash?: boolean
   onFocusStorage?: (id: string) => void
-  onDuplicateStorage?: (storage: Storage) => void
+  onCopyStorage?: (storage: Storage) => void      // ⋯ 복사 → 앱 클립보드
+  canPasteStorage?: boolean                       // 클립보드에 수납장 있음 — 방 ⋯에 붙여넣기 노출
+  onPasteStorage?: (room: Room) => void
 }
 
 // 집 전체 아코디언: 방 → 수납장 → 칸(무한중첩) → 물건. 카테고리화의 본체(목록 뷰).
@@ -70,6 +72,7 @@ function TreeRoom({ room, ...p }: { room: Room } & Props) {
         expanded={expanded}
         onToggle={() => { setExpanded((e) => !e); p.onSelectRoom?.(focused ? null : room.id) }}
         addActions={[{ icon: 'plus', label: '수납장 추가', onClick: () => { setAdding(true); setExpanded(true) } }]}
+        onPaste={p.canPasteStorage ? () => p.onPasteStorage?.(room) : undefined}
         onRename={(n) => p.onRenameRoom(room, n)}
         deleteTitle="방 삭제" deleteMessage={`'${room.name}' 방과 그 안의 수납장·물건이 함께 삭제됩니다`}
         onDelete={() => p.onDeleteRoom(room)}
@@ -119,7 +122,7 @@ function TreeStorage({ storage, ...p }: { storage: Storage } & Props) {
           { icon: 'box-plus', label: '물건 추가', onClick: () => { setAddingItem(true); setExpanded(true) } },
         ]}
         onRename={(n) => p.onRenameStorage(storage, n)}
-        onDuplicate={() => p.onDuplicateStorage?.(storage)}
+        onDuplicate={() => p.onCopyStorage?.(storage)}
         deleteTitle="수납장 삭제" deleteMessage={`'${storage.name}' 수납장과 그 안의 물건이 함께 삭제됩니다`}
         onDelete={() => p.onDeleteStorage(storage)}
       />

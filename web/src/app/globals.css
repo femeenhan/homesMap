@@ -175,7 +175,7 @@ header{
 .btn-ghost{background:var(--panel);color:var(--ink-soft)}
 
 /* 물건 행(단일 라인) */
-.titem{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 6px;border-radius:7px}
+.titem{display:flex;align-items:center;gap:6px;min-height:44px;padding:0 6px;border-radius:7px}
 .titem:hover{background:var(--panel)}
 .titem-thumb{width:20px;height:20px;border-radius:5px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;overflow:hidden;flex-shrink:0;color:var(--ink-soft)}
 .titem-thumb img{width:100%;height:100%;object-fit:cover}

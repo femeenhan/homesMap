@@ -19,6 +19,7 @@ type Props = {
   levelClass?: string
   addActions?: { icon: IconName; label: string; onClick: () => void }[] // 행 인라인 추가 버튼들(이 레벨에서 바로 추가 가능한 동작 — 예: 방→수납장/칸)
   onDuplicate?: () => void
+  onPaste?: () => void // 클립보드 내용이 있을 때만 전달 — ⋯에 '붙여넣기' 노출
 }
 
 const pad = (d: number) => ({ paddingLeft: d * 14 + 6 })
@@ -26,7 +27,7 @@ const pad = (d: number) => ({ paddingLeft: d * 14 + 6 })
 // 방/수납장/칸 공용 행. 탭=펼치기, 이름수정은 ⋯메뉴로만(탭으로 편집 안 됨). 추가는 addActions(행 인라인 버튼) 또는 화면 단위 AddRow가 담당.
 export function TreeRow({
   depth, icon, name, count, expandable, expanded, onToggle,
-  onRename, deleteTitle, deleteMessage, onDelete, levelClass = '', addActions, onDuplicate,
+  onRename, deleteTitle, deleteMessage, onDelete, levelClass = '', addActions, onDuplicate, onPaste,
 }: Props) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(name)
@@ -70,16 +71,16 @@ export function TreeRow({
               <Icon name={a.icon} size={16} />
             </button>
           ))}
-          <RowMenu onEditName={startEdit} onDelete={onDelete} deleteTitle={deleteTitle} deleteMessage={deleteMessage} onDuplicate={onDuplicate} />
+          <RowMenu onEditName={startEdit} onDelete={onDelete} deleteTitle={deleteTitle} deleteMessage={deleteMessage} onDuplicate={onDuplicate} onPaste={onPaste} />
         </span>
       )}
     </div>
   )
 }
 
-// ⋯ 메뉴: 이름 수정 / (있으면) 복사 / 삭제. 시트(.sheet) 재사용, 삭제는 Modal 확인.
-export function RowMenu({ onEditName, onDuplicate, onDelete, deleteTitle, deleteMessage }: {
-  onEditName: () => void; onDuplicate?: () => void; onDelete: () => void; deleteTitle: string; deleteMessage: string
+// ⋯ 메뉴: 이름 수정 / (있으면) 복사·붙여넣기 / 삭제. 시트(.sheet) 재사용, 삭제는 Modal 확인.
+export function RowMenu({ onEditName, onDuplicate, onPaste, onDelete, deleteTitle, deleteMessage }: {
+  onEditName: () => void; onDuplicate?: () => void; onPaste?: () => void; onDelete: () => void; deleteTitle: string; deleteMessage: string
 }) {
   const [open, setOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -93,6 +94,9 @@ export function RowMenu({ onEditName, onDuplicate, onDelete, deleteTitle, delete
               <button type="button" className="rowmenu-item" onClick={() => { setOpen(false); onEditName() }}>이름 수정</button>
               {onDuplicate && (
                 <button type="button" className="rowmenu-item" onClick={() => { setOpen(false); onDuplicate() }}>복사</button>
+              )}
+              {onPaste && (
+                <button type="button" className="rowmenu-item" onClick={() => { setOpen(false); onPaste() }}>붙여넣기</button>
               )}
               <button type="button" className="rowmenu-item danger" onClick={() => { setOpen(false); setConfirming(true) }}>삭제</button>
             </div>

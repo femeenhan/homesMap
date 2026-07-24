@@ -77,6 +77,7 @@ export function ItemRow({ item, photoUrl, depth, onDelete }: {
 }) {
   return (
     <div className="titem" style={pad(depth)}>
+      <span className="trow-caret" aria-hidden="true" />{/* 트리 행과 동일한 캐럿 자리 — 하위 항목 정렬 */}
       <span className="titem-thumb">
         {photoUrl
           // eslint-disable-next-line @next/next/no-img-element -- blob: objectURL
