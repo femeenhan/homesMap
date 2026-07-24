@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  COLS, ROOM_DEFAULT, STORAGE_DEFAULT,
+  COLS, STORAGE_DEFAULT,
   isLegacyRoom, convertLegacyRoom, roomInnerGrid, rectsOverlap,
   contentRows, autoPlace, migrateLegacyGeometry, storageRect,
 } from './grid'
