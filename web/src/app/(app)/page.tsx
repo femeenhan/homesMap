@@ -66,15 +66,20 @@ export default function AppHomePage() {
   async function loadLocalData(familyId: string, userId: string, offline: boolean) {
     const fdk = keys.getFDK()
     if (!fdk) return
-    const [roomsRaw, storagesRaw, items, members, activity] = await Promise.all([
+    const [roomsRaw, storagesRaw, itemsRaw, membersRaw, activityRaw] = await Promise.all([
       store.allActive<Room>('rooms'),
       store.allActive<Storage>('storages'),
       store.allActive<Item>('items'),
       store.getAll<FamilyMember>('members'),
       store.getAll<Activity>('activity'),
     ])
-    let rooms = roomsRaw
-    let storages = storagesRaw
+    // 현재 가족(familyId) 데이터만 표시 — 과거 로그인 계정 시절 캐시(다른 키로 암호화)가 같은
+    // IndexedDB에 남아 있어도 섞임·해독 실패 배너를 만들지 않게 격리. 캐시 자체는 보존(로그인 복원 대비).
+    const items = itemsRaw.filter((r) => r.family_id === familyId)
+    const members = membersRaw.filter((r) => r.family_id === familyId)
+    const activity = activityRaw.filter((r) => r.family_id === familyId)
+    let rooms = roomsRaw.filter((r) => r.family_id === familyId)
+    let storages = storagesRaw.filter((r) => r.family_id === familyId)
     // 구 px 좌표(940×600 시절) 1회 셀 변환 — 변경분만 dirty 저장(스펙 §2)
     const mig = migrateLegacyGeometry(rooms, storages)
     if (mig.changedRooms.length > 0 || mig.changedStorages.length > 0) {
