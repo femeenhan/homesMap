@@ -22,7 +22,12 @@ function openDB(): Promise<IDBDatabase> {
         if (!db.objectStoreNames.contains('dirty')) db.createObjectStore('dirty') // out-of-line key `${table}:${id}` -> { table, id }, one entry per dirty row (atomic put/del, no read-modify-write)
         if (!db.objectStoreNames.contains('photos')) db.createObjectStore('photos') // key=itemId → Blob(평문)
       }
-      req.onsuccess = () => resolve(req.result)
+      // 구버전 탭이 커넥션을 쥐고 있으면 업그레이드가 영원히 블로킹 → 백지 화면 대신 에러 UI로
+      req.onblocked = () => reject(new Error('다른 탭에서 앱이 열려 있어요 — 다른 탭을 닫고 새로고침 해주세요'))
+      req.onsuccess = () => {
+        req.result.onversionchange = () => req.result.close() // 새 버전 배포 시 구 커넥션 자진 종료
+        resolve(req.result)
+      }
       req.onerror = () => reject(req.error)
     })
   }
