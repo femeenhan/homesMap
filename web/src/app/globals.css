@@ -427,6 +427,19 @@ header{
 @keyframes gm-focus{0%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
 .gm-focus .gm-stack,.gm-focus .gm-items{animation:gm-focus 1.6s ease-out}
 
+/* 편집 모드: 셀 스냅 드래그 이동 + 44px 코너 핸들 리사이즈 */
+.gmap-bar{display:flex;align-items:center;gap:8px}
+.gmap-bar .tadd-row,.gmap-bar .tadd-form{flex:1}
+.gmap-edit{flex-shrink:0;font-size:13px;font-weight:600;padding:8px 14px;border-radius:8px;background:var(--panel);color:var(--ink-soft)}
+.gmap-edit.on{background:var(--accent);color:#fff}
+.gm-edit{touch-action:none;cursor:move}
+.gm-selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.gm-grip{
+  position:absolute;right:-14px;bottom:-14px;width:44px;height:44px;touch-action:none;cursor:se-resize;
+  display:flex;align-items:center;justify-content:center;
+}
+.gm-grip::after{content:'';width:20px;height:20px;border-radius:6px;background:var(--accent);box-shadow:var(--shadow)}
+
 /* 드로어(도식화) 상단 칸/물건 추가 · 최하단 방 추가 */
 .dp-actions{display:flex;gap:4px;padding:2px 4px 6px}
 .dp-form{border-top:1px solid var(--line);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
