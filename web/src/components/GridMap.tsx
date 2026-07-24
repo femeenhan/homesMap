@@ -249,6 +249,7 @@ function EditableTile({ rect, cell, cols, minW, minH, editing, selected, classNa
     setDrag({ mode, sx: e.clientX, sy: e.clientY, cur: rect })
   }
   function move(e: React.PointerEvent) {
+    e.stopPropagation()
     if (!drag) return
     const dx = Math.round((e.clientX - drag.sx) / cell)
     const dy = Math.round((e.clientY - drag.sy) / cell)
@@ -264,7 +265,8 @@ function EditableTile({ rect, cell, cols, minW, minH, editing, selected, classNa
           },
     })
   }
-  function end() {
+  function end(e: React.PointerEvent) {
+    e.stopPropagation()
     if (!drag) return
     const c = drag.cur
     setDrag(null)
